@@ -26,7 +26,7 @@ functions:
   , verify/3
 
 equations:
-    verify(pk(k), sign(sk(k), m), m) = true()
+    verify(pk(k), sign(sk(k), m), m) = true
 
 
 /*
