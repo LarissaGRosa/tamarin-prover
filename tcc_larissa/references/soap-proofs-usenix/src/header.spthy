@@ -1,0 +1,41 @@
+restriction OnlyOnce:
+  "All t #x #y. OnlyOnce(t) @ #x & OnlyOnce(t) @ #y ==> #x = #y"
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ #i ==> x = y"
+
+restriction Inequality:
+  "All x #t. Neq(x, x) @ #t ==> F"
+
+builtins: signing
+functions: fingerprint/1, extract/1, s256/1, h/2
+
+// Fingerprint function only needs to be collision resistant
+equations: extract(fingerprint(x)) = x
+
+rule Phone:
+  []
+  --[ ClaimNumber($A, $Number)
+    , IsPhoneNumber($Number) ]->
+  [ !Phone($A, $Number) ]
+
+rule SMSOut[color=#FFFFFF]:
+  [ SMS_Out($Number, sms), !Phone($A, $Number) ]
+  -->
+  [ !SMS($Number, sms) ]
+
+rule AdversarySMSOut[color=#FF6961]:
+  [ In(sms), !Phone($A, $Number) ]
+  --[ AdversaryActivity() ]->
+  [ !SMS($Number, sms) ]
+
+rule SMSIn[color=#FFFFFF]:
+  [ !SMS($Number, sms) ]
+  -->
+  [ SMS_In($Number, sms) ]
+
+rule SMSLeak[color=#FF6961]:
+  [ !SMS($Number, sms) ]
+  --[ SMSLeak()
+    , AdversaryActivity() ]->
+  [ Out(sms) ]

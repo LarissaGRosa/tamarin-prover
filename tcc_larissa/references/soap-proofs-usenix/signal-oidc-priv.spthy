@@ -1,0 +1,88 @@
+theory MessagingOIDCPrivacy
+begin
+
+restriction Equality:
+  "All x y #i. Eq(x, y) @ #i ==> x = y"
+
+restriction Inequality:
+  "All x #t. Neq(x, x) @ #t ==> F"
+
+functions: fingerprint/1, extract/1, s256/1, h/2, pk/1
+
+// Fingerprint function only needs to be collision resistant
+equations: extract(fingerprint(x)) = x
+
+rule MessagingKeyGen:
+  [ Fr(~sk) ]
+  -->
+  [ !MessagingLtk($User, ~sk) ]
+
+rule AccountCreation:
+  []
+  -->
+  // Use public value for password because the IdP is the adversary, i.e., knows
+  // the password.
+  [ !Account($Username, $PW) ]
+
+// OpenID Connect Auth code + PKCE flow
+rule OIDCAppLaunchBrowser[color=#B4D9EF]:
+  let fp = fingerprint(<pk(skProver), pk(skVerifier)>)
+      fakeFp = fingerprint(<pk(skA), pk(skB)>)
+      hash = h(diff(fp, fakeFp), salt)
+      code_challenge = s256(code_verifier)
+  in
+  [ !MessagingLtk($Prover, skProver)
+  , !MessagingLtk($Verifier, skVerifier)
+  , !MessagingLtk($A, skA)
+  , !MessagingLtk($B, skB)
+  , Fr(salt), Fr(nonce), Fr(code_verifier) ]
+  -->
+  [ Out(<'oidc_req', hash, nonce, code_challenge>)
+  // This Out fact models that the adversary can access authorization requests.
+  , Out(<hash, nonce, code_challenge>)
+  , SessionStore($Prover, nonce, <$Verifier, hash, salt, code_verifier>) ]
+
+rule OIDCIdPInit[color=#B4D9EF]:
+  [ In(<'oidc_req', hash, nonce, code_challenge>) ]
+  -->
+  [ Out('auth_req')
+  , St_OIDCServer_Auth(hash, nonce, code_challenge) ]
+
+rule OIDCAppLogin[color=#B4D9EF]:
+  [ In('auth_req')
+  , !Account($Username, $PW) ]
+  -->
+  [ Out(<'login', $Username, $PW>) ]
+
+rule OIDCIdPIssueCode[color=#B4D9EF]:
+  [ !Account($Username, $PW)
+  , Fr(~code)
+  , St_OIDCServer_Auth(hash, nonce, code_challenge)
+  , In(<'login', $Username, $PW>) ]
+  -->
+  [ Out(<'code', ~code, nonce>)
+  , St_OIDCIdP_Code($Username, ~code, hash, nonce, code_challenge) ]
+
+rule OIDCAppCodeRedirect[color=#B4D9EF]:
+  [ SessionStore($Prover, nonce, <$Verifier, hash, salt, code_verifier>)
+  , In(<'code', code, nonce>) ]
+  --[ TokenRequestWithCode(code)
+    , Neq(nonce, 'null') ]->
+  [ Out(<'token_req', code, code_verifier>) ]
+
+rule OIDCIdPTokenIssue[color=#B4D9EF]:
+  let token = <$Username, nonce, hash>
+  in
+  [ St_OIDCIdP_Code($Username, code, hash, nonce, code_challenge)
+  , In(<'token_req', code, code_verifier>) ]
+  --[ Eq(s256(code_verifier), code_challenge)
+    , IssueTokenForCode(code) ]->
+  [ Out(<'token', token>) ]
+
+lemma Executability:
+  exists-trace
+  "Ex code #a #b.
+      TokenRequestWithCode(code) @ #a
+    & IssueTokenForCode(code) @ #b"
+
+end

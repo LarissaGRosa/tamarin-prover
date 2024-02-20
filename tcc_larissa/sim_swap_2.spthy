@@ -197,6 +197,8 @@ lemma Sim_swap_secret_answer:
       & K(correctAnswer(question(phoneNumber, seedK))) @ #j
         /* E usa essa resposta para finalizar o processo de troca de chip */
       & Attacker_Answers(phoneNumber, seedK) @ #k
+      & j < i
+      & k < i
         /* sem que tenha realizado um ataca externo as questões */
       & not(Ex #r. Question_attack(phoneNumber, seedK) @ r)
     )

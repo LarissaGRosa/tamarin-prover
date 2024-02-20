@@ -1,0 +1,108 @@
+rule KeyServer:
+  [ !Domain($Domain) ]
+  --[ OnlyOnce('key_server')
+    , IsKeyServer($Domain) ]->
+  [ !KeyServer($Domain) ]
+
+// We use the standard Tamarin secure channel model for SMS and TLS, but not for
+// modelling end-to-end encryption because the standard secure channel model
+// lead to a blow-up in message sources, which prevented us from even starting
+// Tamarin. Therefore, we use a model using an equational theory that is close
+// to asymmetric encryption and signatures combined.
+// The downside of this model is that it is less idiomatic. Sometimes,
+// participants must access other participant's secret key material.
+functions: e2ee/3, e2eeDec/2
+equations : e2eeDec(e2ee(sks, pk(skr), m), skr) = m
+
+rule MessagingRegister[color=#FDFD96]:
+  [ Fr(~sk), Fr(~sess)
+  , !Phone($A, $Number), !KeyServer($KeyServer) ]
+  --[ IsMessagingKey(~sk) ]->
+  [ TLSClient_Out('GET', ~sess, $KeyServer, <'msg_signup_req', $Number, pk(~sk)>)
+  , Out(pk(~sk))
+  , St_MessagingReg_App($A, $Number, ~sess, ~sk) ]
+
+rule MessagingChallenge[color=#FDFD96]:
+  [ Fr(~challenge)
+  , !KeyServer($Server)
+  , TLSServer_In('GET', ~sess, $Server, <'msg_signup_req', $Number, ltk>) ]
+  --[ IsOTP(~challenge) ]->
+  [ SMS_Out($Number, ~challenge)
+  , St_SigReg_Server(~sess, $Number, ltk, ~challenge) ]
+
+rule MessagingRespond[color=#FDFD96]:
+  [ !KeyServer($Server), St_MessagingReg_App($A, $Number, ~sess, sk)
+  , SMS_In($Number, challenge) ]
+  --[ MustBeOTP(challenge) ]->
+  [ TLSClient_Out('GET', ~sess, $Server, <'otp_respond', challenge>)
+  , St_MessagingReg_AppWait($A, $Number, ~sess, sk) ]
+
+rule MessagingAck[color=#FDFD96]:
+  [ !KeyServer($Server)
+  , St_SigReg_Server(~sess, $Number, ltk, challenge)
+  , TLSServer_In('GET', ~sess, $Server, <'otp_respond', challenge>) ]
+  --[ MessagingKeyServer($Number, ltk) ]->
+  [ !MessagingLtkServer($Number, ltk)
+  , TLSServer_Out('GET', ~sess, $Server, 'msg_signup_ack') ]
+
+// The key server only stores one key per phone number.
+restriction KeysUnique:
+  "All phone ltk1 ltk2 #a #b. MessagingKeyServer(phone, ltk1) @ #a
+      & MessagingKeyServer(phone, ltk2) @ #b
+  ==> #a = #b & ltk1 = ltk2"
+
+rule MessagingFin[color=#FDFD96]:
+  [ !KeyServer($Server)
+  , St_MessagingReg_AppWait($A, $Number, ~sess, sk)
+  , TLSClient_In('GET', ~sess, $Server, 'msg_signup_ack') ]
+  --[ ClaimMessagingKey($A, $Number, sk) ]->
+  [ !MessagingLtkUser($A, $Number, sk)[no_precomp] ]
+
+rule MessagingCompromise[color=#FF6961]:
+  [ !MessagingLtkUser($A, $Number, ~sk)[no_precomp] ]
+  --[ CompromisedMessaging($A, pk(~sk))
+    , AdversaryActivity() ]->
+  [ Out(~sk) ]
+
+rule MessagingKeyRequest[color=#9AD5D8]:
+  [ !MessagingLtkServer($Number, ltk)
+  , !KeyServer($Server)
+  , TLSServer_In('GET', ~sess, $Server, <'msg_key_req', $Number>) ]
+  --[ MustBeMessagingKey(ltk) ]->
+  [ TLSServer_Out('GET', ~sess, $Server, <'msg_key_resp', $Number, ltk>) ]
+
+rule ObtainKey[color=#9AD5D8]:
+  [ Fr(~sess), !KeyServer($Server) ]
+  -->
+  [ TLSClient_Out('GET', ~sess, $Server, <'msg_key_req', $Phone>)
+  , St_KeyReq($A, $Phone, ~sess) ]
+
+rule ObtainKeyFin[color=#9AD5D8]:
+  [ !KeyServer($Server)
+  , St_KeyReq($A, $Phone, ~sess)
+  , TLSClient_In('GET', ~sess, $Server, <'msg_key_resp', $Phone, ltk>) ]
+  -->
+  [ !UseMessagingKeyFor($A, $Phone, ltk)[no_precomp] ]
+
+// By factoring out the generation of a fresh message, we can use the SendAsTo
+// interface to send the ID token later.
+rule SendInterface:
+  [ Fr(~m) ]
+  -->
+  [ SendAsTo($A, $Phone, ~m) ]
+
+rule MessagingSend:
+  [ SendAsTo($A, $PeerPhone, m)
+  , !MessagingLtkUser($A, $MyPhone, ~sk)[no_precomp], !UseMessagingKeyFor($A, $PeerPhone, ltk)[no_precomp] ]
+  --[ SendMessaging(pk(~sk), ltk, m)
+    , Sender($A)
+    , SendTo($PeerPhone, 'messaging', m) ]->
+  [ Out(e2ee(~sk, ltk, m)) ]
+
+rule MessagingReceive:
+  [ !MessagingLtkUser($A, $MyPhone, ~skr)[no_precomp], !UseMessagingKeyFor($A, $PeerPhone, pk(skPeer))[no_precomp]
+  , In(e2ee(skPeer, pk(~skr), m)) ]
+  --[ ReceiveMessaging(pk(skPeer), pk(~skr), m) ]->
+  []
+
+predicates: KeyServerCompromise() <=> Ex d #x #y. IsKeyServer(d) @ #x & CompromisedDomain(d) @ #y
