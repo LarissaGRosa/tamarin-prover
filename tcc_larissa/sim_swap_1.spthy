@@ -15,7 +15,7 @@ equations:
 
 
 
-rule init_user:
+rule InitUserOnNetwork:
     /* 
         
        REGISTRA UM USUÁRIO ARBITRÁRIO U NA REDE TELEFÔNICA R
@@ -29,7 +29,7 @@ rule init_user:
     */
     [ Fr(~iccid), Fr(~imsKi), Fr(~userId), Fr(~initialUserName), Fr(~initialUserPhoneNumber) ]
     
-    --[ Init_User($U, ~userId) ]->
+    --[ InitUser($U, ~userId) ]->
     
     [ !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber), 
       !IMSI('PAIS', $U, ~userId, ~imsKi),
@@ -37,7 +37,7 @@ rule init_user:
       Out(~initialUserName), Out(~initialUserPhoneNumber)
     ]
 
-rule init_operator:
+rule InitOperatorOnNetwork:
     /*
        REGISTRA UM OPERADOR ARBITRÁRIO OP NA REDE TELEFÔNICA R
 
@@ -45,12 +45,12 @@ rule init_operator:
     */
     [Fr(~opId)] 
 
-    --[Init_Operator($O, ~opId)]-> 
+    --[InitOperator($O, ~opId)]-> 
     
     [!Operator($O, ~opId, 'REDE')]
 
 
-rule init_sim_swap:
+rule InitSimSwapWithOperator:
     /* INICIA SIM SWAP DE UM USUÁRIO U, POR UM OPERADOR O, EM UMA REDE R
       Recebe os dados relacionados ao número de telefone (initialUserPhoneNumber e initialUserName)
       disponíveis livremente,
@@ -63,7 +63,7 @@ rule init_sim_swap:
     */
     [!Operator(O, opId, 'REDE'),  In(initialUserPhoneNumber),  Fr(~seedK)]
 
-    --[Init_SimSwap(initialUserPhoneNumber, ~seedK)]->
+    --[InitSimSwap(initialUserPhoneNumber, ~seedK)]->
 
     [
         SimSwapINIT(~seedK, opId, initialUserPhoneNumber),
@@ -71,7 +71,7 @@ rule init_sim_swap:
         Out(~seedK)
     ]
 
-rule sim_swap_answer:
+rule AnswerSimSwapToOperator:
     /*
       USUÁRIO U RECEBE QUESTÃO Q E FAZ A PROVA DE IDENTIDADE
 
@@ -91,7 +91,7 @@ rule sim_swap_answer:
         SimSwapANSWER(a, opId, initialUserPhoneNumber, seedK)
     ]
 
-rule confirm_sim_swap:
+rule ConfirmSimSwapWithOperator:
     /*
       OPERADOR O CONFIRMA SIM SWAP NA REDE R PARA UM USUÁRIO U
       Recebe o fato contendo a permissão para a troca de chip e um novo ICCID gerado para esse novo
@@ -101,7 +101,7 @@ rule confirm_sim_swap:
     --[ConfirmSimSwap(initialUserPhoneNumber, seedK)]->
     [FinishAnswer(~newICCID, initialUserPhoneNumber, seedK)]
 
-rule finish_sim_swap:
+rule FinishSimSwapOnNetwork:
     /* 
       ATUALIZA CONTA DO USUÁRIO U NA REDE TELEFONICA R COM O NOVO ICCID
 
@@ -113,7 +113,7 @@ rule finish_sim_swap:
     --[FinishSimSwap(initialUserPhoneNumber, seedK)]->
     [ !UserICCID(newICCID, userId)]
 
-rule secret_question_attacked[colour=#BE2444]:
+rule SecretQuestionAttacked[colour=#BE2444]:
     /*
       REGRA DE AUXILIO AO ATACANTE 1
 
@@ -125,20 +125,31 @@ rule secret_question_attacked[colour=#BE2444]:
         c = answers(initialUserPhoneNumber, seedK, correctAnswer(question(initialUserPhoneNumber, seedK)))
     in
     [!UserAccount(R, userId, initialUserName, initialUserPhoneNumber), In(seedK)]
-    --[Question_attack(initialUserPhoneNumber, seedK)]->
+    --[QuestionAttack(initialUserPhoneNumber, seedK)]->
     [Out(c)]
 
-rule attacker_answers_question[colour=#C40233]:
+rule AttackerAnswersQuestion[colour=#C40233]:
     let 
       c = answers(initialUserPhoneNumber, seedK, correctAnswer(question(initialUserPhoneNumber, seedK)))
     in
    
     [ In(c), !Operator(O, opId, 'REDE'), In(initialUserPhoneNumber), In(seedK) ]
-    --[ Attacker_Answers(initialUserPhoneNumber, seedK) ]->
+    --[ AttackerAnswers(initialUserPhoneNumber, seedK) ]->
     [SimSwapANSWER(permission(initialUserPhoneNumber, seedK), opId, initialUserPhoneNumber, seedK) ]
 
 
-
+lemma Sim_swap_finish_honest:
+" /* Para cada troca de chip finalizada no sistema para um número de telefone e uma seed K */
+  ( All phoneNumber seedK #i.  FinishSimSwap(phoneNumber, seedK) @ #i
+      ==>
+        /* tem um usuário que respondeu a requisição */
+      ( (
+        Ex #j. AnswerSimSwap(phoneNumber, seedK) @ j 
+        & j < i
+        )
+      )
+  )
+"
   
 lemma Sim_swap_finish_honest_or_attack:
   " /* Para cada troca de chip finalizada no sistema para um número de telefone e uma seed K */
@@ -150,7 +161,7 @@ lemma Sim_swap_finish_honest_or_attack:
           & j < i
          )
          /* ou o adversário fez um ataque as perguntas de segurança */
-          | (Ex #r. Attacker_Answers(phoneNumber, seedK) @ r &  r < i)
+          | (Ex #r. AttackerAnswers(phoneNumber, seedK) @ r &  r < i)
        )
     )
   "
@@ -164,9 +175,9 @@ lemma Sim_swap_secret_answer:
         /* e o atacante conhece a resposta de uma pergunta a partir de uma seed K qualquer*/
       & K(correctAnswer(question(phoneNumber, seedK))) @ #j
         /* E usa essa resposta para finalizar o processo de troca de chip */
-      & Attacker_Answers(phoneNumber, seedK) @ #k
+      & AttackerAnswers(phoneNumber, seedK) @ #k
         /* sem que tenha realizado um ataca externo as questões */
-      & not(Ex #r. Question_attack(phoneNumber, seedK) @ r)
+      & not(Ex #r. QuestionAttack(phoneNumber, seedK) @ r)
     )
   "
 
