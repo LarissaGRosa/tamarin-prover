@@ -4,10 +4,12 @@ theory sim_swap_3
 begin
 
 
-functions: permission/2 [private], question/2, answers/3[private], correctAnswer/1 [private], getSwapCode/1
+functions: permission/2 [private], question/2, answers/3[private], correctAnswer/1 [private], 
+           sendConfirmationToSecureContact/3, getSentPin/1
 
 equations:
     answers(T, K, correctAnswer(question(T, K))) = permission(T, K)
+    getSentPin(sendConfirmationToSecureContact(T, K, P)) = P
 
 
 
@@ -54,27 +56,64 @@ rule AnswerSimSwapToOperator:
     [ SimSwapINIT(seedK, opId, initialUserPhoneNumber), In(question(initialUserPhoneNumber, seedK))]
     --[AnswerSimSwap(initialUserPhoneNumber, seedK)]->
     [
-        SimSwapANSWER(a, opId, initialUserPhoneNumber, seedK),
-       
+        SimSwapANSWER(a, opId, initialUserPhoneNumber, seedK)
+    ]
+
+rule OperatorAskForSelectSecureContact:
+    [SimSwapANSWER(a, opId, initialUserPhoneNumber, seedK), Fr(~newICCID), Fr(~pinICCID), !UserAccount(U, userId, initialUserName, initialUserPhoneNumber, userSecureContact)]
+    -->
+    [
+      Out("Select a number for choose your secure contact"), 
+      SimSwapASKFORCONTACT(a, opId, initialUserPhoneNumber, seedK),
+      !UserOnApproveICCID(~newICCID, ~pinICCID,  userId)
+    ]
+
+rule UserSelectsSecureContact:
+    [SimSwapASKFORCONTACT(a, opId, initialUserPhoneNumber, seedK), Fr(~randomNumberForSelectContact), In("Select a number for choose your secure contact")]
+    --[SelectSecureContact(initialUserPhoneNumber, seedK, ~randomNumberForSelectContact)]->
+    [Out(~randomNumberForSelectContact), SimSwapSELECTSCONTACT(a, opId, initialUserPhoneNumber, seedK, ~randomNumberForSelectContact)]
+
+    
+rule SendMessageToContactWithOperator:
+    let
+      userSecureContactMessage = sendConfirmationToSecureContact(initialUserPhoneNumber, randomNumberForSelectContact, pinICCID)
+    in
+    [SimSwapSELECTSCONTACT(a, opId, initialUserPhoneNumber, seedK, randomNumberForSelectContact), !UserOnApproveICCID(newICCID, pinICCID,  userId), In(randomNumberForSelectContact)]
+    --[SendMessageSimSwap(initialUserPhoneNumber, randomNumberForSelectContact)]->
+    [ 
+      SimSwapMESSAGECONTACT(a, opId, initialUserPhoneNumber, randomNumberForSelectContact, seedK)
+      Out_S($I,$R, userSecureContactMessage)
     ]
 
 
-rule SendMessageToContactWithOperator:
-    
-    [SimSwapANSWER(permission(initialUserPhoneNumber, seedK), opId, initialUserPhoneNumber, seedK), !UserAccount(U, userId, initialUserName, initialUserPhoneNumber, userSecureContact)]
-    --[SendMessageSimSwap(initialUserPhoneNumber, userSecureContact)]->
-    [SimSwapMessageCONTACT(getSwapCode(initialUserPhoneNumber), userSecureContact, seedK)]
-
-rule UserGetsCodeWithContactAndGeneratesNewSim:
-    [SimSwapMessageCONTACT(getSwapCode(initialUserPhoneNumber), userSecureContact, seedK), Fr(~newICCID), !UserAccount(U, userId, initialUserName, initialUserPhoneNumber, userSecureContact)]
-    --[UserGetsNewSim(initialUserPhoneNumber)]->
-    [FinishSwap(getSwapCode(initialUserPhoneNumber), ~newICCID, userId, initialUserPhoneNumber, seedK)]
+rule SecureContactGetsMessagesAndConfirmsWithUser:
+    [SimSwapMESSAGECONTACT(a, opId, initialUserPhoneNumber, randomNumberForSelectContact, seedK), In_S($I,$R, userSecureContactMessage)]
+    -->
+    []
 
 rule FinishSimSwapOnNetwork:
     [FinishSwap(getSwapCode(initialUserPhoneNumber), newICCID, userId, initialUserPhoneNumber, seedK)]
     --[FinishSimSwap(initialUserPhoneNumber, seedK)]->
     [ !UserICCID(newICCID, userId)]
 
+/* 
+Rules for the secure contact channel 
+
+We used the secure channel as the user and the secure contact will authenticate each other socially, but we 
+understand that the attacker can, at a later point, use this messages in some way.
+*/
+
+rule SecureContactChanOut_S:
+        [ Out_S($A,$B,x) ]
+      --[ ChanOut_S($A,$B,x) ]->
+        [ !Sec($A,$B,x) ]
+
+rule SecureContactChanIn_S:
+        [ !Sec($A,$B,x) ]
+      --[ ChanIn_S($A,$B,x) ]->
+        [ In_S($A,$B,x) ]
+
+/* Rules to help model the attacks*/
 rule SecretQuestionAttacked[colour=#BE2444]:
    
     let 
