@@ -1,0 +1,1054 @@
+maude tool: 'maude'
+ checking version: 3.3. OK.
+ checking installation: OK.
+theory sim_swap_with_trusted_operator begin
+
+// Function signature and definition of the equational theory E
+
+functions: answers/3[private,destructor],
+           correctAnswer/1[private,destructor], fst/1, pair/2,
+           permission/2[private,destructor], question/2, snd/1
+equations:
+    answers(T, K, correctAnswer(question(T, K))) = permission(T, K),
+    fst(<x.1, x.2>) = x.1,
+    snd(<x.1, x.2>) = x.2
+
+
+
+
+
+rule (modulo E) AnswerSimSwapToOperator:
+   [
+   SimSwapINIT( seedK, opId, initialUserPhoneNumber ),
+   In( question(initialUserPhoneNumber, seedK) )
+   ]
+  --[ AnswerSimSwap( initialUserPhoneNumber, seedK ) ]->
+   [
+   SimSwapANSWER( answers(initialUserPhoneNumber, seedK,
+                          correctAnswer(question(initialUserPhoneNumber, seedK))),
+                  opId, initialUserPhoneNumber, seedK
+   )
+   ]
+
+  /*
+  rule (modulo AC) AnswerSimSwapToOperator:
+     [
+     SimSwapINIT( seedK, opId, initialUserPhoneNumber ),
+     In( question(initialUserPhoneNumber, seedK) )
+     ]
+    --[ AnswerSimSwap( initialUserPhoneNumber, seedK ) ]->
+     [
+     SimSwapANSWER( permission(initialUserPhoneNumber, seedK), opId,
+                    initialUserPhoneNumber, seedK
+     )
+     ]
+  */
+
+rule (modulo E) ConfirmSimSwapWithOperator:
+   [
+   SimSwapANSWER( permission(initialUserPhoneNumber, seedK), opId,
+                  initialUserPhoneNumber, seedK
+   ),
+   Fr( ~newICCID )
+   ]
+  --[ ConfirmSimSwap( initialUserPhoneNumber, seedK ) ]->
+   [ FinishAnswer( ~newICCID, initialUserPhoneNumber, seedK ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) FinishSimSwapOnNetwork:
+   [
+   FinishAnswer( newICCID, initialUserPhoneNumber, seedK ),
+   !UserAccount( R, userId, initialUserName, initialUserPhoneNumber )
+   ]
+  --[ FinishSimSwap( initialUserPhoneNumber, seedK ) ]->
+   [ !UserICCID( newICCID, userId ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) InitUserOnNetwork:
+   [
+   Fr( ~iccid ), Fr( ~imsKi ), Fr( ~userId ), Fr( ~initialUserName ),
+   Fr( ~initialUserPhoneNumber )
+   ]
+  --[ InitUser( $U, ~userId ) ]->
+   [
+   !UserAccount( $U, ~userId, ~initialUserName, ~initialUserPhoneNumber ),
+   !IMSI( 'PAIS', $U, ~userId, ~imsKi ), !UserICCID( ~iccid, ~userId ),
+   Out( ~initialUserName ), Out( ~initialUserPhoneNumber )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) InitSimSwapWithOperator:
+   [
+   !Operator( O, opId, 'REDE' ), In( initialUserPhoneNumber ), Fr( ~seedK )
+   ]
+  --[ InitSimSwap( initialUserPhoneNumber, ~seedK ) ]->
+   [
+   SimSwapINIT( ~seedK, opId, initialUserPhoneNumber ),
+   Out( question(initialUserPhoneNumber, ~seedK) ), Out( ~seedK )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) InitOperatorOnNetwork:
+   [ Fr( ~opId ) ]
+  --[ InitOperator( $O, ~opId ) ]->
+   [ !Operator( $O, ~opId, 'REDE' ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) SecretQuestionAttacked[color=#be2444]:
+   [
+   !UserAccount( R, userId, initialUserName, initialUserPhoneNumber ),
+   In( seedK )
+   ]
+  --[ QuestionAttack( initialUserPhoneNumber, seedK ) ]->
+   [
+   Out( answers(initialUserPhoneNumber, seedK,
+                correctAnswer(question(initialUserPhoneNumber, seedK)))
+   )
+   ]
+
+  /*
+  rule (modulo AC) SecretQuestionAttacked[color=#be2444]:
+     [
+     !UserAccount( R, userId, initialUserName, initialUserPhoneNumber ),
+     In( seedK )
+     ]
+    --[ QuestionAttack( initialUserPhoneNumber, seedK ) ]->
+     [ Out( permission(initialUserPhoneNumber, seedK) ) ]
+  */
+
+rule (modulo E) AttackerAnswersQuestion[color=#c40233]:
+   [
+   In( answers(initialUserPhoneNumber, seedK,
+               correctAnswer(question(initialUserPhoneNumber, seedK)))
+   ),
+   !Operator( O, opId, 'REDE' ), In( initialUserPhoneNumber ), In( seedK )
+   ]
+  --[ AttackerAnswers( initialUserPhoneNumber, seedK ) ]->
+   [
+   SimSwapANSWER( permission(initialUserPhoneNumber, seedK), opId,
+                  initialUserPhoneNumber, seedK
+   )
+   ]
+
+  /*
+  rule (modulo AC) AttackerAnswersQuestion[color=#c40233]:
+     [
+     In( permission(initialUserPhoneNumber, seedK) ),
+     !Operator( O, opId, 'REDE' ), In( initialUserPhoneNumber ), In( seedK )
+     ]
+    --[ AttackerAnswers( initialUserPhoneNumber, seedK ) ]->
+     [
+     SimSwapANSWER( permission(initialUserPhoneNumber, seedK), opId,
+                    initialUserPhoneNumber, seedK
+     )
+     ]
+  */
+
+lemma Sim_swap_finish_honest:
+  all-traces
+  "∀ phoneNumber seedK #i.
+    (FinishSimSwap( phoneNumber, seedK ) @ #i) ⇒
+    (∃ #j. (AnswerSimSwap( phoneNumber, seedK ) @ #j) ∧ (#j < #i))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ phoneNumber seedK #i.
+  (FinishSimSwap( phoneNumber, seedK ) @ #i)
+ ∧
+  ∀ #j. (AnswerSimSwap( phoneNumber, seedK ) @ #j) ⇒ ¬(#j < #i)"
+*/
+simplify
+solve( FinishAnswer( newICCID, phoneNumber, seedK ) ▶₀ #i )
+  case ConfirmSimSwapWithOperator_case_2
+  solve( !UserAccount( R, userId, initialUserName, ~initialUserPhoneNumber
+         ) ▶₁ #i )
+    case InitUserOnNetwork
+    solve( !KU( ~initialUserPhoneNumber ) @ #vk.1 )
+      case InitUserOnNetwork
+      SOLVED // trace found
+    qed
+  qed
+qed
+
+lemma Sim_swap_finish_honest_or_attack:
+  all-traces
+  "∀ phoneNumber seedK #i.
+    (FinishSimSwap( phoneNumber, seedK ) @ #i) ⇒
+    ((∃ #j. (AnswerSimSwap( phoneNumber, seedK ) @ #j) ∧ (#j < #i)) ∨
+     (∃ #r. (AttackerAnswers( phoneNumber, seedK ) @ #r) ∧ (#r < #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ phoneNumber seedK #i.
+  (FinishSimSwap( phoneNumber, seedK ) @ #i)
+ ∧
+  (∀ #j. (AnswerSimSwap( phoneNumber, seedK ) @ #j) ⇒ ¬(#j < #i)) ∧
+  (∀ #r. (AttackerAnswers( phoneNumber, seedK ) @ #r) ⇒ ¬(#r < #i))"
+*/
+simplify
+solve( FinishAnswer( newICCID, phoneNumber, seedK ) ▶₀ #i )
+  case ConfirmSimSwapWithOperator_case_1
+  by contradiction /* from formulas */
+next
+  case ConfirmSimSwapWithOperator_case_2
+  by contradiction /* from formulas */
+qed
+
+lemma Sim_swap_secret_answer:
+  all-traces
+  "¬(∃ phoneNumber seedK #i #j #k.
+      (((FinishSimSwap( phoneNumber, seedK ) @ #i) ∧
+        (K( correctAnswer(question(phoneNumber, seedK)) ) @ #j)) ∧
+       (AttackerAnswers( phoneNumber, seedK ) @ #k)) ∧
+      (¬(∃ #r. QuestionAttack( phoneNumber, seedK ) @ #r)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ phoneNumber seedK #i #j #k.
+  (FinishSimSwap( phoneNumber, seedK ) @ #i) ∧
+  (K( correctAnswer(question(phoneNumber, seedK)) ) @ #j) ∧
+  (AttackerAnswers( phoneNumber, seedK ) @ #k)
+ ∧
+  ∀ #r. (QuestionAttack( phoneNumber, seedK ) @ #r) ⇒ ⊥"
+*/
+simplify
+solve( FinishAnswer( newICCID, phoneNumber, seedK ) ▶₀ #i )
+  case ConfirmSimSwapWithOperator_case_1
+  solve( !UserAccount( R, userId, initialUserName, phoneNumber ) ▶₁ #i )
+    case InitUserOnNetwork
+    solve( !Operator( O, opId, 'REDE' ) ▶₁ #k )
+      case InitOperatorOnNetwork
+      solve( !KU( permission(~initialUserPhoneNumber, ~seedK) ) @ #vk.1 )
+        case SecretQuestionAttacked
+        by contradiction /* from formulas */
+      qed
+    qed
+  qed
+next
+  case ConfirmSimSwapWithOperator_case_2
+  by contradiction /* from formulas */
+qed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* All wellformedness checks were successful. */
+
+/*
+Generated from:
+Tamarin version 1.8.0
+Maude version 3.3
+Git revision: UNKNOWN, branch: UNKNOWN
+Compiled at: 2024-03-05 22:05:01.883814954 UTC
+*/
+
+end
+
+==============================================================================
+summary of summaries:
+
+analyzed: simSwapWithTrustedOperator.spthy
+
+  processing time: 0.33s
+  
+  Sim_swap_finish_honest (all-traces): falsified - found trace (5 steps)
+  Sim_swap_finish_honest_or_attack (all-traces): verified (4 steps)
+  Sim_swap_secret_answer (all-traces): verified (7 steps)
+
+==============================================================================
+maude tool: 'maude'
+ checking version: 3.3. OK.
+ checking installation: OK.
+theory sim_swap_with_untrusted_operator begin
+
+// Function signature and definition of the equational theory E
+
+functions: answers/3[private,destructor],
+           correctAnswer/1[private,destructor], fst/1, pair/2,
+           permission/2[private,destructor], question/2, snd/1
+equations:
+    answers(T, K, correctAnswer(question(T, K))) = permission(T, K),
+    fst(<x.1, x.2>) = x.1,
+    snd(<x.1, x.2>) = x.2
+
+
+
+
+
+rule (modulo E) AnswerSimSwapToOperator:
+   [
+   SimSwapINIT( seedK, opId, initialUserPhoneNumber ),
+   In( question(initialUserPhoneNumber, seedK) )
+   ]
+  --[ AnswerSimSwap( initialUserPhoneNumber, seedK ) ]->
+   [
+   SimSwapANSWER( answers(initialUserPhoneNumber, seedK,
+                          correctAnswer(question(initialUserPhoneNumber, seedK))),
+                  opId, initialUserPhoneNumber, seedK
+   )
+   ]
+
+  /*
+  rule (modulo AC) AnswerSimSwapToOperator:
+     [
+     SimSwapINIT( seedK, opId, initialUserPhoneNumber ),
+     In( question(initialUserPhoneNumber, seedK) )
+     ]
+    --[ AnswerSimSwap( initialUserPhoneNumber, seedK ) ]->
+     [
+     SimSwapANSWER( permission(initialUserPhoneNumber, seedK), opId,
+                    initialUserPhoneNumber, seedK
+     )
+     ]
+  */
+
+rule (modulo E) ConfirmSimSwapWithOperator:
+   [
+   SimSwapANSWER( permission(initialUserPhoneNumber, seedK), opId,
+                  initialUserPhoneNumber, seedK
+   ),
+   Fr( ~newICCID )
+   ]
+  --[ ConfirmSimSwap( initialUserPhoneNumber, seedK ) ]->
+   [ FinishAnswer( ~newICCID, initialUserPhoneNumber, seedK ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) FinishSimSwapOnNetwork:
+   [
+   FinishAnswer( newICCID, initialUserPhoneNumber, seedK ),
+   !UserAccount( R, userId, initialUserName, initialUserPhoneNumber )
+   ]
+  --[ FinishSimSwap( initialUserPhoneNumber, seedK ) ]->
+   [ !UserICCID( newICCID, userId ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) InitUserOnNetwork:
+   [
+   Fr( ~iccid ), Fr( ~imsKi ), Fr( ~userId ), Fr( ~initialUserName ),
+   Fr( ~initialUserPhoneNumber )
+   ]
+  --[ InitUser( $U, ~userId ) ]->
+   [
+   !UserAccount( $U, ~userId, ~initialUserName, ~initialUserPhoneNumber ),
+   !IMSI( 'PAIS', $U, ~userId, ~imsKi ), !UserICCID( ~iccid, ~userId ),
+   Out( ~initialUserName ), Out( ~initialUserPhoneNumber )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) InitSimSwapWithOperator:
+   [
+   !Operator( O, opId, 'REDE' ), In( initialUserPhoneNumber ), Fr( ~seedK )
+   ]
+  --[ InitSimSwap( initialUserPhoneNumber, ~seedK ) ]->
+   [
+   SimSwapINIT( ~seedK, opId, initialUserPhoneNumber ),
+   Out( question(initialUserPhoneNumber, ~seedK) ), Out( ~seedK )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) InitOperatorOnNetwork:
+   [ Fr( ~opId ) ]
+  --[ InitOperator( $O, ~opId ) ]->
+   [ !Operator( $O, ~opId, 'REDE' ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) SecretQuestionAttacked[color=#be2444]:
+   [
+   !UserAccount( R, userId, initialUserName, initialUserPhoneNumber ),
+   In( seedK )
+   ]
+  --[ QuestionAttack( initialUserPhoneNumber, seedK ) ]->
+   [
+   Out( answers(initialUserPhoneNumber, seedK,
+                correctAnswer(question(initialUserPhoneNumber, seedK)))
+   )
+   ]
+
+  /*
+  rule (modulo AC) SecretQuestionAttacked[color=#be2444]:
+     [
+     !UserAccount( R, userId, initialUserName, initialUserPhoneNumber ),
+     In( seedK )
+     ]
+    --[ QuestionAttack( initialUserPhoneNumber, seedK ) ]->
+     [ Out( permission(initialUserPhoneNumber, seedK) ) ]
+  */
+
+rule (modulo E) AttackerAnswersQuestion[color=#c40233]:
+   [
+   In( answers(initialUserPhoneNumber, seedK,
+               correctAnswer(question(initialUserPhoneNumber, seedK)))
+   ),
+   !Operator( O, opId, 'REDE' ), In( initialUserPhoneNumber ), In( seedK )
+   ]
+  --[ AttackerAnswers( initialUserPhoneNumber, seedK ) ]->
+   [
+   SimSwapANSWER( permission(initialUserPhoneNumber, seedK), opId,
+                  initialUserPhoneNumber, seedK
+   )
+   ]
+
+  /*
+  rule (modulo AC) AttackerAnswersQuestion[color=#c40233]:
+     [
+     In( permission(initialUserPhoneNumber, seedK) ),
+     !Operator( O, opId, 'REDE' ), In( initialUserPhoneNumber ), In( seedK )
+     ]
+    --[ AttackerAnswers( initialUserPhoneNumber, seedK ) ]->
+     [
+     SimSwapANSWER( permission(initialUserPhoneNumber, seedK), opId,
+                    initialUserPhoneNumber, seedK
+     )
+     ]
+  */
+
+rule (modulo E) InitDishonestOperatorSimSwap[color=#fdbe87]:
+   [
+   OperatorC( O, opId ), In( initialUserPhoneNumber ), Fr( ~seedK ),
+   Fr( ~newICCID )
+   ]
+  --[ InitCorruptedSimSwap( initialUserPhoneNumber, ~seedK ) ]->
+   [ FinishAnswer( ~newICCID, initialUserPhoneNumber, ~seedK ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) AttackerHelperOperator[color=#ff6600]:
+   [ !Operator( O, opId, 'REDE' ) ]
+  --[ CorruptedOperator( O, opId ) ]->
+   [ OperatorC( O, opId ) ]
+
+  /* has exactly the trivial AC variant */
+
+lemma Sim_swap_finish_honest:
+  all-traces
+  "∀ phoneNumber seedK #i.
+    (FinishSimSwap( phoneNumber, seedK ) @ #i) ⇒
+    (∃ #j. (AnswerSimSwap( phoneNumber, seedK ) @ #j) ∧ (#j < #i))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ phoneNumber seedK #i.
+  (FinishSimSwap( phoneNumber, seedK ) @ #i)
+ ∧
+  ∀ #j. (AnswerSimSwap( phoneNumber, seedK ) @ #j) ⇒ ¬(#j < #i)"
+*/
+simplify
+solve( FinishAnswer( newICCID, phoneNumber, seedK ) ▶₀ #i )
+  case ConfirmSimSwapWithOperator_case_2
+  solve( !UserAccount( R, userId, initialUserName, ~initialUserPhoneNumber
+         ) ▶₁ #i )
+    case InitUserOnNetwork
+    solve( !KU( ~initialUserPhoneNumber ) @ #vk.1 )
+      case InitUserOnNetwork
+      SOLVED // trace found
+    qed
+  qed
+qed
+
+lemma Sim_swap_finish_honest_or_attack:
+  all-traces
+  "∀ phoneNumber seedK #i.
+    (FinishSimSwap( phoneNumber, seedK ) @ #i) ⇒
+    ((∃ #j. (AnswerSimSwap( phoneNumber, seedK ) @ #j) ∧ (#j < #i)) ∨
+     (∃ #r. (AttackerAnswers( phoneNumber, seedK ) @ #r) ∧ (#r < #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ phoneNumber seedK #i.
+  (FinishSimSwap( phoneNumber, seedK ) @ #i)
+ ∧
+  (∀ #j. (AnswerSimSwap( phoneNumber, seedK ) @ #j) ⇒ ¬(#j < #i)) ∧
+  (∀ #r. (AttackerAnswers( phoneNumber, seedK ) @ #r) ⇒ ¬(#r < #i))"
+*/
+simplify
+solve( FinishAnswer( newICCID, phoneNumber, seedK ) ▶₀ #i )
+  case InitDishonestOperatorSimSwap
+  solve( !UserAccount( R, userId, initialUserName, phoneNumber ) ▶₁ #i )
+    case InitUserOnNetwork
+    solve( !KU( ~initialUserPhoneNumber ) @ #vk )
+      case InitUserOnNetwork
+      SOLVED // trace found
+    qed
+  qed
+qed
+
+lemma Sim_swap_secret_answer:
+  all-traces
+  "¬(∃ phoneNumber seedK #i #j #k.
+      (((FinishSimSwap( phoneNumber, seedK ) @ #i) ∧
+        (K( correctAnswer(question(phoneNumber, seedK)) ) @ #j)) ∧
+       (AttackerAnswers( phoneNumber, seedK ) @ #k)) ∧
+      (¬(∃ #r. QuestionAttack( phoneNumber, seedK ) @ #r)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ phoneNumber seedK #i #j #k.
+  (FinishSimSwap( phoneNumber, seedK ) @ #i) ∧
+  (K( correctAnswer(question(phoneNumber, seedK)) ) @ #j) ∧
+  (AttackerAnswers( phoneNumber, seedK ) @ #k)
+ ∧
+  ∀ #r. (QuestionAttack( phoneNumber, seedK ) @ #r) ⇒ ⊥"
+*/
+simplify
+solve( FinishAnswer( newICCID, phoneNumber, seedK ) ▶₀ #i )
+  case ConfirmSimSwapWithOperator_case_1
+  solve( !UserAccount( R, userId, initialUserName, phoneNumber ) ▶₁ #i )
+    case InitUserOnNetwork
+    solve( !Operator( O, opId, 'REDE' ) ▶₁ #k )
+      case InitOperatorOnNetwork
+      solve( !KU( permission(~initialUserPhoneNumber, ~seedK) ) @ #vk.1 )
+        case SecretQuestionAttacked
+        by contradiction /* from formulas */
+      qed
+    qed
+  qed
+next
+  case ConfirmSimSwapWithOperator_case_2
+  by contradiction /* from formulas */
+next
+  case InitDishonestOperatorSimSwap
+  solve( !UserAccount( R, userId, initialUserName, phoneNumber ) ▶₁ #i )
+    case InitUserOnNetwork
+    solve( !Operator( O, opId, 'REDE' ) ▶₁ #k )
+      case InitOperatorOnNetwork
+      solve( !KU( permission(~initialUserPhoneNumber, ~seedK) ) @ #vk.1 )
+        case SecretQuestionAttacked
+        by contradiction /* from formulas */
+      qed
+    qed
+  qed
+qed
+
+lemma Sim_swap_finish_honest_or_attack_or_operator:
+  all-traces
+  "∀ phoneNumber seedK #i.
+    (FinishSimSwap( phoneNumber, seedK ) @ #i) ⇒
+    (((∃ #j. (AnswerSimSwap( phoneNumber, seedK ) @ #j) ∧ (#j < #i)) ∨
+      (∃ #r. (AttackerAnswers( phoneNumber, seedK ) @ #r) ∧ (#r < #i))) ∨
+     (∃ #k. (InitCorruptedSimSwap( phoneNumber, seedK ) @ #k) ∧ (#k < #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ phoneNumber seedK #i.
+  (FinishSimSwap( phoneNumber, seedK ) @ #i)
+ ∧
+  (∀ #j. (AnswerSimSwap( phoneNumber, seedK ) @ #j) ⇒ ¬(#j < #i)) ∧
+  (∀ #r. (AttackerAnswers( phoneNumber, seedK ) @ #r) ⇒ ¬(#r < #i)) ∧
+  (∀ #k. (InitCorruptedSimSwap( phoneNumber, seedK ) @ #k) ⇒ ¬(#k < #i))"
+*/
+simplify
+solve( FinishAnswer( newICCID, phoneNumber, seedK ) ▶₀ #i )
+  case ConfirmSimSwapWithOperator_case_1
+  by contradiction /* from formulas */
+next
+  case ConfirmSimSwapWithOperator_case_2
+  by contradiction /* from formulas */
+next
+  case InitDishonestOperatorSimSwap
+  by contradiction /* from formulas */
+qed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* All wellformedness checks were successful. */
+
+/*
+Generated from:
+Tamarin version 1.8.0
+Maude version 3.3
+Git revision: UNKNOWN, branch: UNKNOWN
+Compiled at: 2024-03-05 22:05:01.883814954 UTC
+*/
+
+end
+
+==============================================================================
+summary of summaries:
+
+analyzed: simSwapWithUntrustedOperator.spthy
+
+  processing time: 0.39s
+  
+  Sim_swap_finish_honest (all-traces): falsified - found trace (5 steps)
+  Sim_swap_finish_honest_or_attack (all-traces): falsified - found trace (5 steps)
+  Sim_swap_secret_answer (all-traces): verified (11 steps)
+  Sim_swap_finish_honest_or_attack_or_operator (all-traces): verified (5 steps)
+
+==============================================================================
+maude tool: 'maude'
+ checking version: 3.3. OK.
+ checking installation: OK.
+theory sim_swap_with_social_authentication begin
+
+// Function signature and definition of the equational theory E
+
+functions: answers/3[private,destructor],
+           correctAnswer/1[private,destructor], fst/1, getSentPin/1, pair/2,
+           permission/2[private,destructor], question/2,
+           sendConfirmationToSecureContact/3, snd/1
+equations:
+    answers(T, K, correctAnswer(question(T, K))) = permission(T, K),
+    fst(<x.1, x.2>) = x.1,
+    getSentPin(sendConfirmationToSecureContact(T, K, P)) = P,
+    snd(<x.1, x.2>) = x.2
+
+
+
+
+
+rule (modulo E) AnswerSimSwapToOperator:
+   [
+   SimSwapINIT( seedK, opId, initialUserPhoneNumber ), Fr( ~newICCID ),
+   Fr( ~pinICCID ), In( question(initialUserPhoneNumber, seedK) )
+   ]
+  --[ AnswerSimSwap( initialUserPhoneNumber, seedK ) ]->
+   [
+   SimSwapANSWER( answers(initialUserPhoneNumber, seedK,
+                          correctAnswer(question(initialUserPhoneNumber, seedK))),
+                  opId, initialUserPhoneNumber, seedK
+   ),
+   Out_S( $U, $S, <'trying_sim_swap', ~pinICCID> ),
+   !UserOnApproveICCID( ~newICCID, ~pinICCID, initialUserPhoneNumber )
+   ]
+
+  /*
+  rule (modulo AC) AnswerSimSwapToOperator:
+     [
+     SimSwapINIT( seedK, opId, initialUserPhoneNumber ), Fr( ~newICCID ),
+     Fr( ~pinICCID ), In( question(initialUserPhoneNumber, seedK) )
+     ]
+    --[ AnswerSimSwap( initialUserPhoneNumber, seedK ) ]->
+     [
+     SimSwapANSWER( permission(initialUserPhoneNumber, seedK), opId,
+                    initialUserPhoneNumber, seedK
+     ),
+     Out_S( $U, $S, <'trying_sim_swap', ~pinICCID> ),
+     !UserOnApproveICCID( ~newICCID, ~pinICCID, initialUserPhoneNumber )
+     ]
+  */
+
+rule (modulo E) OperatorAskForSelectSecureContact:
+   [
+   SimSwapANSWER( a, opId, initialUserPhoneNumber, seedK ), Fr( ~newICCID ),
+   Fr( ~pinICCID ),
+   !UserAccount( U, userId, initialUserName, initialUserPhoneNumber,
+                 userSecureContact
+   )
+   ]
+  -->
+   [
+   Out( 'Select_a_number_for_choose_your_secure_contact' ),
+   SimSwapASKFORCONTACT( a, opId, initialUserPhoneNumber, seedK )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) UserSelectsSecureContact:
+   [
+   SimSwapASKFORCONTACT( a, opId, initialUserPhoneNumber, seedK ),
+   Fr( ~randomNumberForSelectContact ),
+   In( 'Select_a_number_for_choose_your_secure_contact' )
+   ]
+  --[
+  SelectSecureContact( initialUserPhoneNumber, seedK,
+                       ~randomNumberForSelectContact
+  )
+  ]->
+   [
+   Out( ~randomNumberForSelectContact ),
+   SimSwapSELECTSCONTACT( a, opId, initialUserPhoneNumber, seedK,
+                          ~randomNumberForSelectContact
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) SendMessageToContactWithOperator:
+   [
+   SimSwapSELECTSCONTACT( a, opId, initialUserPhoneNumber, seedK,
+                          randomNumberForSelectContact
+   ),
+   !UserOnApproveICCID( newICCID, pinICCID, initialUserPhoneNumber ),
+   In( randomNumberForSelectContact )
+   ]
+  --[
+  SendMessageSimSwap( initialUserPhoneNumber, randomNumberForSelectContact
+  )
+  ]->
+   [
+   SimSwapMESSAGECONTACT( a, opId, initialUserPhoneNumber,
+                          randomNumberForSelectContact,
+                          sendConfirmationToSecureContact(initialUserPhoneNumber,
+                                                          randomNumberForSelectContact, pinICCID),
+                          seedK
+   ),
+   Out_S( $N, $S,
+          sendConfirmationToSecureContact(initialUserPhoneNumber,
+                                          randomNumberForSelectContact, pinICCID)
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) SecureContactGetsMessagesAndConfirmsWithUser:
+   [
+   SimSwapMESSAGECONTACT( a, opId, initialUserPhoneNumber,
+                          randomNumberForSelectContact, userSecureContactMessage, seedK
+   ),
+   In_S( N, S, userSecureContactMessage )
+   ]
+  -->
+   [
+   SimSwapRECEIVECONFIRMMESSAGE( a, opId, initialUserPhoneNumber,
+                                 randomNumberForSelectContact, seedK, userSecureContactMessage
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) SecureContactComparesPinAndFinishSimSwap:
+   [
+   In_S( U, S, <'trying_sim_swap', pinICCID> ),
+   SimSwapRECEIVECONFIRMMESSAGE( a, opId, initialUserPhoneNumber,
+                                 randomNumberForSelectContact, seedK, userSecureContactMessage
+   )
+   ]
+  --[
+  Eq( pinICCID, getSentPin(userSecureContactMessage) ),
+  ConfirmsPinSimSwap( initialUserPhoneNumber, seedK )
+  ]->
+   [ FinishSwap( initialUserPhoneNumber, pinICCID, seedK ) ]
+
+  /*
+  rule (modulo AC) SecureContactComparesPinAndFinishSimSwap:
+     [
+     In_S( U, S, <'trying_sim_swap', pinICCID> ),
+     SimSwapRECEIVECONFIRMMESSAGE( a, opId, initialUserPhoneNumber,
+                                   randomNumberForSelectContact, seedK, userSecureContactMessage
+     )
+     ]
+    --[
+    Eq( pinICCID, z ), ConfirmsPinSimSwap( initialUserPhoneNumber, seedK )
+    ]->
+     [ FinishSwap( initialUserPhoneNumber, pinICCID, seedK ) ]
+    variants (modulo AC)
+    1. userSecureContactMessage
+             = userSecureContactMessage.13
+       z     = getSentPin(userSecureContactMessage.13)
+    
+    2. userSecureContactMessage
+             = sendConfirmationToSecureContact(x.16, x.17, z.15)
+       z     = z.15
+  */
+
+rule (modulo E) FinishSimSwapOnNetwork:
+   [
+   FinishSwap( initialUserPhoneNumber, pinICCID1, seedK ),
+   !UserOnApproveICCID( newICCID, pinICCID, initialUserPhoneNumber )
+   ]
+  --[
+  Eq( pinICCID, pinICCID1 ), FinishSimSwap( initialUserPhoneNumber, seedK )
+  ]->
+   [ !UserICCID( newICCID, initialUserPhoneNumber ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) InitUserOnNetwork:
+   [
+   Fr( ~iccid ), Fr( ~imsKi ), Fr( ~userId ), Fr( ~initialUserName ),
+   Fr( ~initialUserPhoneNumber ), Fr( ~userSecureContact )
+   ]
+  --[ InitUser( $U, ~userId ) ]->
+   [
+   !UserAccount( $U, ~userId, ~initialUserName, ~initialUserPhoneNumber,
+                 ~userSecureContact
+   ),
+   !IMSI( 'PAIS', $U, ~userId, ~imsKi ), !UserICCID( ~iccid, ~userId ),
+   Out( ~initialUserName ), Out( ~initialUserPhoneNumber )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) InitSimSwapWithOperator:
+   [
+   !Operator( O, opId, 'REDE' ), In( initialUserPhoneNumber ), Fr( ~seedK )
+   ]
+  --[ InitSimSwap( initialUserPhoneNumber, ~seedK ) ]->
+   [
+   SimSwapINIT( ~seedK, opId, initialUserPhoneNumber ),
+   Out( question(initialUserPhoneNumber, ~seedK) ), Out( ~seedK )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) InitOperatorOnNetwork:
+   [ Fr( ~opId ) ]
+  --[ InitOperator( $O, ~opId ) ]->
+   [ !Operator( $O, ~opId, 'REDE' ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) SecureContactChanOut_S[color=#189bcc]:
+   [ Out_S( $A, $B, x ) ]
+  --[ ChanOut_S( $A, $B, x ) ]->
+   [ !Sec( $A, $B, x ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) SecureContactChanIn_S[color=#d6f7ff]:
+   [ !Sec( $A, $B, x ) ] --[ ChanIn_S( $A, $B, x ) ]-> [ In_S( $A, $B, x ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) SecretQuestionAttacked[color=#be2444]:
+   [
+   !UserAccount( R, userId, initialUserName, initialUserPhoneNumber,
+                 userSecureContact
+   ),
+   In( seedK )
+   ]
+  --[ QuestionAttack( initialUserPhoneNumber, seedK ) ]->
+   [
+   Out( answers(initialUserPhoneNumber, seedK,
+                correctAnswer(question(initialUserPhoneNumber, seedK)))
+   )
+   ]
+
+  /*
+  rule (modulo AC) SecretQuestionAttacked[color=#be2444]:
+     [
+     !UserAccount( R, userId, initialUserName, initialUserPhoneNumber,
+                   userSecureContact
+     ),
+     In( seedK )
+     ]
+    --[ QuestionAttack( initialUserPhoneNumber, seedK ) ]->
+     [ Out( permission(initialUserPhoneNumber, seedK) ) ]
+  */
+
+rule (modulo E) AttackerAnswersQuestion[color=#c40233]:
+   [
+   In( answers(initialUserPhoneNumber, seedK,
+               correctAnswer(question(initialUserPhoneNumber, seedK)))
+   ),
+   !Operator( O, opId, 'REDE' ), In( initialUserPhoneNumber ), In( seedK ),
+   Fr( ~newICCID ), Fr( ~pinICCID )
+   ]
+  --[ AttackerAnswers( initialUserPhoneNumber, seedK ) ]->
+   [
+   SimSwapANSWER( permission(initialUserPhoneNumber, seedK), opId,
+                  initialUserPhoneNumber, seedK
+   ),
+   !UserOnApproveICCID( ~newICCID, ~pinICCID, initialUserPhoneNumber )
+   ]
+
+  /*
+  rule (modulo AC) AttackerAnswersQuestion[color=#c40233]:
+     [
+     In( permission(initialUserPhoneNumber, seedK) ),
+     !Operator( O, opId, 'REDE' ), In( initialUserPhoneNumber ), In( seedK ),
+     Fr( ~newICCID ), Fr( ~pinICCID )
+     ]
+    --[ AttackerAnswers( initialUserPhoneNumber, seedK ) ]->
+     [
+     SimSwapANSWER( permission(initialUserPhoneNumber, seedK), opId,
+                    initialUserPhoneNumber, seedK
+     ),
+     !UserOnApproveICCID( ~newICCID, ~pinICCID, initialUserPhoneNumber )
+     ]
+  */
+
+rule (modulo E) InitDishonestOperatorSimSwap[color=#fdbe87]:
+   [
+   OperatorC( O, opId ), In( initialUserPhoneNumber ), Fr( ~seedK ),
+   Fr( ~newICCID )
+   ]
+  --[ InitCorruptedSimSwap( initialUserPhoneNumber, ~seedK ) ]->
+   [ FinishAnswer( ~newICCID, initialUserPhoneNumber, ~seedK ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) AttackerHelperOperator[color=#ff6600]:
+   [ !Operator( O, opId, 'REDE' ) ]
+  --[ CorruptedOperator( O, opId ) ]->
+   [ OperatorC( O, opId ) ]
+
+  /* has exactly the trivial AC variant */
+
+lemma Sim_swap_secret_answer:
+  all-traces
+  "¬(∃ phoneNumber seedK #i #j #k.
+      (((FinishSimSwap( phoneNumber, seedK ) @ #i) ∧
+        (K( correctAnswer(question(phoneNumber, seedK)) ) @ #j)) ∧
+       (AttackerAnswers( phoneNumber, seedK ) @ #k)) ∧
+      (¬(∃ #r. QuestionAttack( phoneNumber, seedK ) @ #r)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ phoneNumber seedK #i #j #k.
+  (FinishSimSwap( phoneNumber, seedK ) @ #i) ∧
+  (K( correctAnswer(question(phoneNumber, seedK)) ) @ #j) ∧
+  (AttackerAnswers( phoneNumber, seedK ) @ #k)
+ ∧
+  ∀ #r. (QuestionAttack( phoneNumber, seedK ) @ #r) ⇒ ⊥"
+*/
+simplify
+solve( FinishSwap( phoneNumber, pinICCID, seedK ) ▶₀ #i )
+  case SecureContactComparesPinAndFinishSimSwap_case_1
+  solve( !UserOnApproveICCID( newICCID, ~pinICCID, ~initialUserPhoneNumber
+         ) ▶₁ #i )
+    case AnswerSimSwapToOperator
+    solve( !Operator( O, opId, 'REDE' ) ▶₁ #k )
+      case InitOperatorOnNetwork
+      solve( !KU( permission(~initialUserPhoneNumber, ~seedK) ) @ #vk.1 )
+        case SecretQuestionAttacked
+        by contradiction /* from formulas */
+      qed
+    qed
+  qed
+next
+  case SecureContactComparesPinAndFinishSimSwap_case_2
+  by contradiction /* from formulas */
+qed
+
+restriction equality:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+lemma Sim_swap_finish_honest:
+  all-traces
+  "∀ phoneNumber seedK #i.
+    (FinishSimSwap( phoneNumber, seedK ) @ #i) ⇒
+    (∃ #j. (ConfirmsPinSimSwap( phoneNumber, seedK ) @ #j) ∧ (#j < #i))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ phoneNumber seedK #i.
+  (FinishSimSwap( phoneNumber, seedK ) @ #i)
+ ∧
+  ∀ #j. (ConfirmsPinSimSwap( phoneNumber, seedK ) @ #j) ⇒ ¬(#j < #i)"
+*/
+simplify
+solve( FinishSwap( phoneNumber, pinICCID, seedK ) ▶₀ #i )
+  case SecureContactComparesPinAndFinishSimSwap_case_1
+  by contradiction /* from formulas */
+next
+  case SecureContactComparesPinAndFinishSimSwap_case_2
+  by contradiction /* from formulas */
+qed
+
+lemma Sim_swap_finish_honest_or_attack:
+  all-traces
+  "∀ phoneNumber seedK #i.
+    (FinishSimSwap( phoneNumber, seedK ) @ #i) ⇒
+    ((∃ #j. (ConfirmsPinSimSwap( phoneNumber, seedK ) @ #j) ∧ (#j < #i)) ∨
+     (∃ #r. (AttackerAnswers( phoneNumber, seedK ) @ #r) ∧ (#r < #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ phoneNumber seedK #i.
+  (FinishSimSwap( phoneNumber, seedK ) @ #i)
+ ∧
+  (∀ #j. (ConfirmsPinSimSwap( phoneNumber, seedK ) @ #j) ⇒ ¬(#j < #i)) ∧
+  (∀ #r. (AttackerAnswers( phoneNumber, seedK ) @ #r) ⇒ ¬(#r < #i))"
+*/
+simplify
+solve( FinishSwap( phoneNumber, pinICCID, seedK ) ▶₀ #i )
+  case SecureContactComparesPinAndFinishSimSwap_case_1
+  by contradiction /* from formulas */
+next
+  case SecureContactComparesPinAndFinishSimSwap_case_2
+  by contradiction /* from formulas */
+qed
+
+lemma Sim_swap_finish_honest_or_attack_or_operator:
+  all-traces
+  "∀ phoneNumber seedK #i.
+    (FinishSimSwap( phoneNumber, seedK ) @ #i) ⇒
+    (((∃ #j. (ConfirmsPinSimSwap( phoneNumber, seedK ) @ #j) ∧ (#j < #i)) ∨
+      (∃ #r. (AttackerAnswers( phoneNumber, seedK ) @ #r) ∧ (#r < #i))) ∨
+     (∃ #k. (InitCorruptedSimSwap( phoneNumber, seedK ) @ #k) ∧ (#k < #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ phoneNumber seedK #i.
+  (FinishSimSwap( phoneNumber, seedK ) @ #i)
+ ∧
+  (∀ #j. (ConfirmsPinSimSwap( phoneNumber, seedK ) @ #j) ⇒ ¬(#j < #i)) ∧
+  (∀ #r. (AttackerAnswers( phoneNumber, seedK ) @ #r) ⇒ ¬(#r < #i)) ∧
+  (∀ #k. (InitCorruptedSimSwap( phoneNumber, seedK ) @ #k) ⇒ ¬(#k < #i))"
+*/
+simplify
+solve( FinishSwap( phoneNumber, pinICCID, seedK ) ▶₀ #i )
+  case SecureContactComparesPinAndFinishSimSwap_case_1
+  by contradiction /* from formulas */
+next
+  case SecureContactComparesPinAndFinishSimSwap_case_2
+  by contradiction /* from formulas */
+qed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* All wellformedness checks were successful. */
+
+/*
+Generated from:
+Tamarin version 1.8.0
+Maude version 3.3
+Git revision: UNKNOWN, branch: UNKNOWN
+Compiled at: 2024-03-05 22:05:01.883814954 UTC
+*/
+
+end
+
+==============================================================================
+summary of summaries:
+
+analyzed: simSwapWithSocialAuthentication.spthy
+
+  processing time: 1.23s
+  
+  Sim_swap_secret_answer (all-traces): verified (7 steps)
+  Sim_swap_finish_honest (all-traces): verified (4 steps)
+  Sim_swap_finish_honest_or_attack (all-traces): verified (4 steps)
+  Sim_swap_finish_honest_or_attack_or_operator (all-traces): verified (4 steps)
+
+==============================================================================
