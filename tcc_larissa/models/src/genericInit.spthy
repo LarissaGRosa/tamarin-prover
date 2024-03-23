@@ -1,0 +1,79 @@
+#ifdef SOCIALAUTH
+
+rule InitUserOnNetwork:
+    
+    [ Fr(~iccid), Fr(~imsKi), Fr(~userId), Fr(~initialUserName), Fr(~initialUserPhoneNumber), Fr(~userSecureContact) ]
+    
+    --[ InitUser($U, ~userId) ]->
+    
+    [ !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber, ~userSecureContact), 
+      !IMSI('PAIS', $U, ~userId, ~imsKi),
+      !UserICCID(~iccid, ~userId),
+      Out(~initialUserName), Out(~initialUserPhoneNumber)
+    ]
+
+
+#else
+rule InitUserOnNetwork:
+    /*
+   
+      REGISTER AN ARBITRARY USER U IN THE TELEPHONE NETWORK R
+      
+      - We consider a user containing a SIM and an account;
+      - We need to generate an ID (here as a random value) for their account and for 
+        the identifier of their chip. Furthermore, each user has an IMSI containing digits of their country,
+        network, and user in the system, in addition to a verification key. 
+      - The IMSI is anchored to the account and the ICCID to the chip 
+      - SIM Swap is swapping the connection between UserICCID to a newly generated ICCID
+
+    */
+    [ Fr(~iccid), Fr(~imsKi), Fr(~userId), Fr(~initialUserName), Fr(~initialUserPhoneNumber) ]
+    
+    --[ InitUser($U, ~userId) ]->
+    
+    [ !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber), 
+      !IMSI('PAIS', $U, ~userId, ~imsKi),
+      !UserICCID(~iccid, ~userId),
+      Out(~initialUserName), Out(~initialUserPhoneNumber)
+    ]
+
+#endif
+
+
+rule InitSimSwapWithOperator:
+    /*
+   
+        INITIATES SIM SWAP OF A USER U, BY AN OPERATOR O, IN A NETWORK R
+       
+        - Receives the data related to the phone number (initialUserPhoneNumber and initialUserName);
+        - Sends this data to a pre-registered operator in network R;
+        - Generates a seed K that selects a question Q from the network to verify the user's identity
+        - Generates a log of the action on the network by the phone number and the seed K,
+        - The operator makes the question available on the insecure network
+
+    */
+
+    [!Operator(O, opId, 'REDE'),  In(initialUserPhoneNumber),  Fr(~seedK)]
+
+    --[InitSimSwap(initialUserPhoneNumber, ~seedK)]->
+
+    [
+        SimSwapINIT(~seedK, opId, initialUserPhoneNumber),
+        Out(question(initialUserPhoneNumber, ~seedK)),
+        Out(~seedK)
+    ]  
+    
+rule InitOperatorOnNetwork:
+    /*
+       REGISTER AN ARBITRARY OPERATOR OP IN THE TELEPHONE NETWORK R
+
+       - To simplify, we consider only the operator's ID to create it
+    */
+    [Fr(~opId)] 
+
+    --[InitOperator($O, ~opId)]-> 
+    
+    [!Operator($O, ~opId, 'REDE')]
+
+  
+

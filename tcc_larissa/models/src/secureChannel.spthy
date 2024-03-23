@@ -1,0 +1,17 @@
+/* 
+    RULES FOR THE SECURE CHANNEL
+
+    We used the secure channel as the user and the secure contact will authenticate each other socially, but we 
+    understand that the attacker can, at a later point, use this messages in some way.
+    
+*/
+
+rule SecureContactChanOut_S[colour=#189BCC]:
+        [ Out_S($A,$B,x) ]
+      --[ ChanOut_S($A,$B,x) ]->
+        [ !Sec($A,$B,x) ]
+
+rule SecureContactChanIn_S[colour=#d6f7ff]:
+        [ !Sec($A,$B,x) ]
+      --[ ChanIn_S($A,$B,x) ]->
+        [ In_S($A,$B,x) ]

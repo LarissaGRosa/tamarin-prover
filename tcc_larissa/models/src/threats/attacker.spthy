@@ -1,0 +1,59 @@
+#ifdef SOCIALAUTH
+    
+rule SecretQuestionAttacked[colour=#BE2444]:
+/*
+  RULE OF ASSISTANCE TO ATTACKER 1
+
+  - In this rule, the attacker manages to uncover the answers to the user's questions
+    through an attack on the database or social engineering.
+
+*/
+let 
+    c = answers(initialUserPhoneNumber, seedK, correctAnswer(question(initialUserPhoneNumber, seedK)))
+in
+
+[!UserAccount(R, userId, initialUserName, initialUserPhoneNumber, userSecureContact), In(seedK)]
+
+--[QuestionAttack(initialUserPhoneNumber, seedK)]->
+[Out(c)]
+
+rule AttackerAnswersQuestion[colour=#C40233]:
+    let 
+      c = answers(initialUserPhoneNumber, seedK, correctAnswer(question(initialUserPhoneNumber, seedK)))
+    in
+   
+    [ In(c), !Operator(O, opId, 'REDE'), In(initialUserPhoneNumber), In(seedK), Fr(~newICCID), Fr(~pinICCID) ]
+    --[ AttackerAnswers(initialUserPhoneNumber, seedK) ]->
+    [SimSwapANSWER(permission(initialUserPhoneNumber, seedK), opId, initialUserPhoneNumber, seedK),
+      !UserOnApproveICCID(~newICCID, ~pinICCID,  initialUserPhoneNumber) ]
+
+#else
+
+rule SecretQuestionAttacked[colour=#BE2444]:
+    /*
+      RULE OF ASSISTANCE TO ATTACKER 1
+
+      - In this rule, the attacker manages to uncover the answers to the user's questions
+        through an attack on the database or social engineering.
+    
+    */
+    let 
+        c = answers(initialUserPhoneNumber, seedK, correctAnswer(question(initialUserPhoneNumber, seedK)))
+    in
+    
+    [!UserAccount(R, userId, initialUserName, initialUserPhoneNumber), In(seedK)]
+  
+    --[QuestionAttack(initialUserPhoneNumber, seedK)]->
+    [Out(c)]
+
+rule AttackerAnswersQuestion[colour=#C40233]:
+    let 
+      c = answers(initialUserPhoneNumber, seedK, correctAnswer(question(initialUserPhoneNumber, seedK)))
+    in
+   
+    [ In(c), !Operator(O, opId, 'REDE'), In(initialUserPhoneNumber), In(seedK) ]
+    --[ AttackerAnswers(initialUserPhoneNumber, seedK) ]->
+    [SimSwapANSWER(permission(initialUserPhoneNumber, seedK), opId, initialUserPhoneNumber, seedK) ]
+
+#endif 
+

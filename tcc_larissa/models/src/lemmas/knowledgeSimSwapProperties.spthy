@@ -1,0 +1,14 @@
+lemma Sim_swap_secret_answer:
+  " /* Não pode ser que  */
+    not(
+      Ex phoneNumber seedK #i #j #k.
+        /* o operador aprovou a troca do sim para o número de telefone na rede */
+        FinishSimSwap(phoneNumber, seedK) @ #i
+        /* e o atacante conhece a resposta de uma pergunta a partir de uma seed K qualquer*/
+      & K(correctAnswer(question(phoneNumber, seedK))) @ #j
+        /* E usa essa resposta para finalizar o processo de troca de chip */
+      & AttackerAnswers(phoneNumber, seedK) @ #k
+        /* sem que tenha realizado um ataca externo as questões */
+      & not(Ex #r. QuestionAttack(phoneNumber, seedK) @ r)
+    )
+  "

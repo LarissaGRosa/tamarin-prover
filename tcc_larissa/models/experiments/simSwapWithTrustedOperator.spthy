@@ -1,0 +1,10 @@
+theory sim_swap_with_trusted_operator
+begin
+
+#include "../src/knowledgeBasedSimSwapSteps.spthy"
+#include "../src/genericInit.spthy"
+#include "../src/threats/attacker.spthy"
+#include "../src/lemmas/finishSimSwapProperties.spthy"
+#include "../src/lemmas/knowledgeSimSwapProperties.spthy"
+
+end

@@ -1,0 +1,27 @@
+theory sim_swap_with_untrusted_operator
+begin
+
+#include "../src/knowledgeBasedSimSwapSteps.spthy"
+#include "../src/genericInit.spthy"
+#include "../src/threats/attacker.spthy"
+#include "../src/threats/operator.spthy"
+#include "../src/lemmas/finishSimSwapProperties.spthy"
+#include "../src/lemmas/knowledgeSimSwapProperties.spthy"
+
+
+lemma Sim_swap_finish_honest_or_attack_or_operator:
+    " /* Para cada troca de chip finalizada no sistema para um número de telefone e uma seed K */
+    ( All phoneNumber seedK #i.  FinishSimSwap(phoneNumber, seedK) @ #i
+        ==>
+            /* tem um usuário que respondeu a requisição */
+        ( (
+            Ex #j. AnswerSimSwap(phoneNumber, seedK) @ j 
+            & j < i
+            )
+            /* ou o adversário fez um ataque as perguntas de segurança */
+            | (Ex #r. AttackerAnswers(phoneNumber, seedK) @ r &  r < i)
+            | (Ex #k. InitCorruptedSimSwap(phoneNumber, seedK) @ k & k < i)
+        )
+    )
+    "
+end

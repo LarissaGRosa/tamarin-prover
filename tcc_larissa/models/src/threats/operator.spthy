@@ -1,0 +1,17 @@
+rule InitDishonestOperatorSimSwap[colour=#FDBE87]:
+  [OperatorC(O, opId), In(initialUserPhoneNumber),  Fr(~seedK), Fr(~newICCID)]
+  --[InitCorruptedSimSwap(initialUserPhoneNumber, ~seedK)]->
+  [
+    FinishAnswer(~newICCID, initialUserPhoneNumber, ~seedK)
+  ]
+
+rule AttackerHelperOperator[colour=#FF6600]:
+    /*
+        Modifies an honest operator into a dishonest operator who will assist the attacker
+
+    */
+    [!Operator(O, opId, 'REDE')] 
+
+    --[CorruptedOperator(O, opId)]-> 
+
+    [OperatorC(O, opId)]
