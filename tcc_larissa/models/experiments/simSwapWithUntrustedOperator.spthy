@@ -7,7 +7,9 @@ begin
 #include "../src/threats/operator.spthy"
 #include "../src/lemmas/finishSimSwapProperties.spthy"
 #include "../src/lemmas/knowledgeSimSwapProperties.spthy"
-
+#include "../src/masks/attentive.spthy"
+#include "../src/masks/careless.spthy"
+#include "../src/masks/fearful.spthy"
 
 lemma Sim_swap_finish_honest_or_attack_or_operator:
     " /* Para cada troca de chip finalizada no sistema para um número de telefone e uma seed K */

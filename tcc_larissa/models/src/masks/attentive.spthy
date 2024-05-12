@@ -1,0 +1,35 @@
+/*
+   
+      ATTENTIVE HUMAN MASK
+      
+      - We consider this to be the attentive mask of actions that can be taken by the user U;
+      - For this, the user should be honest, so we consider it has an account in the MNO;
+      - He will only perform action that the system suports and wants, never making mistakes;
+        
+      Eq() is used here to controll which actor can perform this mask and confirms if is always the same user
+
+*/
+
+#ifdef SOCIALAUTH
+
+rule UserAttentive[colour=#9F7E69]:
+    [!HumanMask($M, ~userId, ~phoneNumber), !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber, ~userSecureContact)]
+    --[Eq(<$M,  ~phoneNumber>, <$U, ~initialUserPhoneNumber>), AttentiveMask($M, ~phoneNumber)]->
+    [MaskPerform($M, ~userId, ~phoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE')]
+
+#else
+
+rule UserAttentive[colour=#9F7E69]:
+    [!HumanMask($M, ~userId, ~phoneNumber), !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber)]
+    --[Eq(<$M,  ~phoneNumber>, <$U, ~initialUserPhoneNumber>), AttentiveMask($M, ~phoneNumber)]->
+    [MaskPerform($M, ~userId, ~phoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE')]
+
+#endif
+
+rule AnswerAttentive[colour=#9F7E69]:
+    let
+        answers = correctAnswer(question(initialUserPhoneNumber, ~seedK))
+    in
+    [MaskReactant(U, ~userId, phoneNumber, question), !HumanMask($M, ~userId, initialUserPhoneNumber), In(~seedK)]
+    --[Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>), AttentiveMask($M, phoneNumber)]->
+    [MaskPerform($M, ~userId, phoneNumber, <question, answers>)]

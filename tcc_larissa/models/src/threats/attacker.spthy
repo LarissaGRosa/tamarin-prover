@@ -22,7 +22,7 @@ rule AttackerAnswersQuestion[colour=#C40233]:
       c = answers(initialUserPhoneNumber, seedK, correctAnswer(question(initialUserPhoneNumber, seedK)))
     in
    
-    [ In(c), !Operator(O, opId, 'REDE'), In(initialUserPhoneNumber), In(seedK), Fr(~newICCID), Fr(~pinICCID) ]
+    [ In(c), !Operator(O, opId), In(initialUserPhoneNumber), In(seedK), Fr(~newICCID), Fr(~pinICCID) ]
     --[ AttackerAnswers(initialUserPhoneNumber, seedK) ]->
     [SimSwapANSWER(permission(initialUserPhoneNumber, seedK), opId, initialUserPhoneNumber, seedK),
       !UserOnApproveICCID(~newICCID, ~pinICCID,  initialUserPhoneNumber) ]
@@ -51,7 +51,7 @@ rule AttackerAnswersQuestion[colour=#C40233]:
       c = answers(initialUserPhoneNumber, seedK, correctAnswer(question(initialUserPhoneNumber, seedK)))
     in
    
-    [ In(c), !Operator(O, opId, 'REDE'), In(initialUserPhoneNumber), In(seedK) ]
+    [ In(c), !Operator(O, opId), In(initialUserPhoneNumber), In(seedK) ]
     --[ AttackerAnswers(initialUserPhoneNumber, seedK) ]->
     [SimSwapANSWER(permission(initialUserPhoneNumber, seedK), opId, initialUserPhoneNumber, seedK) ]
 

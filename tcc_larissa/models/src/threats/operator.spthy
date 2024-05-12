@@ -10,7 +10,7 @@ rule AttackerHelperOperator[colour=#FF6600]:
         Modifies an honest operator into a dishonest operator who will assist the attacker
 
     */
-    [!Operator(O, opId, 'REDE')] 
+    [!Operator(O, opId)] 
 
     --[CorruptedOperator(O, opId)]-> 
 

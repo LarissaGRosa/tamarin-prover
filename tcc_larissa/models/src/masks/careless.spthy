@@ -1,0 +1,50 @@
+/*
+   
+      CARELESS HUMAN MASK
+      
+      - We consider this to be the careless mask of actions that can be taken by the user U;
+      - For this, the user should be honest, so we consider it has an account in the MNO;
+      - Careless users will press any of the options in the interface without attentively reading the instructions 
+        or rechecking of credentials they have entered into the system for correctness ;
+        
+      Eq() is used here to controll which actor can perform this mask and confirms if is always the same user
+
+*/
+
+#ifdef SOCIALAUTH
+
+rule UserCareless[colour=#D2BBA0]:
+    /*
+        Here we removed the Eq(<$M,  ~phoneNumber>, <$U, ~initialUserPhoneNumber>) part
+        of the code as the careless user dont care to check if he is trying to change the
+        right phone number -> arbitrary he can do it right or wrong
+    */
+    [!HumanMask($M, ~userId, ~phoneNumber), !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber, ~userSecureContact)]
+    --[CarelessMask($M, ~phoneNumber)]->
+    [MaskPerform($M, ~userId, ~initialUserPhoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE')]
+
+#else
+
+rule UserCareless[colour=#D2BBA0]:
+    [!HumanMask($M, ~userId, ~phoneNumber), !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber)]
+    --[CarelessMask($M, ~phoneNumber)]->
+    [MaskPerform($M, ~userId, ~initialUserPhoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE')]
+
+#endif
+
+rule AnswerCareless[colour=#D2BBA0]:
+
+    let
+        answers = correctAnswer(question(initialUserPhoneNumber, ~seedK))
+    in
+    [MaskReactant(U, ~userId, phoneNumber, question), !HumanMask($M, ~userIdM, initialUserPhoneNumber), In(~seedK)]
+    --[Eq(<$M, ~userIdM>, <U, ~userId>), AttentiveMask($M, phoneNumber)]->
+    [MaskPerform($M, ~userId, phoneNumber, <question, answers>)] 
+
+rule ShowSecretAnswerCareless[colour=#D2BBA0]:
+    let 
+        a = answers(~initialUserPhoneNumber, seedK, correctAnswer(question(~initialUserPhoneNumber, seedK)))
+    in
+    [!HumanMask($M, ~userId, ~initialUserPhoneNumber), In(seedK)]
+    --[CarelessMask($M, ~initialUserPhoneNumber)]->
+    [MaskPerform($M, ~userId, ~initialUserPhoneNumber, a), Out(a)]

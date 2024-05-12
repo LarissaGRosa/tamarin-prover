@@ -8,9 +8,9 @@ begin
 #include "../src/threats/attacker.spthy"
 #include "../src/threats/operator.spthy"
 #include "../src/lemmas/knowledgeSimSwapProperties.spthy"
-
-restriction equality:
-  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+#include "../src/masks/attentive.spthy"
+#include "../src/masks/careless.spthy"
+#include "../src/masks/fearful.spthy"
 
 lemma Sim_swap_finish_honest:
   " /* Para cada troca de chip finalizada no sistema para um número de telefone e uma seed K */

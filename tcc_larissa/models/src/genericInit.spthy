@@ -1,3 +1,6 @@
+restriction Equality:
+  "All x y #i. Eq(x,y) @i ==> x = y"
+
 #ifdef SOCIALAUTH
 
 rule InitUserOnNetwork:
@@ -7,8 +10,9 @@ rule InitUserOnNetwork:
     --[ InitUser($U, ~userId) ]->
     
     [ !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber, ~userSecureContact), 
-      !IMSI('PAIS', $U, ~userId, ~imsKi),
+      !IMSI($U, ~userId, ~imsKi),
       !UserICCID(~iccid, ~userId),
+      !HumanMask($U, ~userId, ~initialUserPhoneNumber),
       Out(~initialUserName), Out(~initialUserPhoneNumber)
     ]
 
@@ -32,8 +36,9 @@ rule InitUserOnNetwork:
     --[ InitUser($U, ~userId) ]->
     
     [ !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber), 
-      !IMSI('PAIS', $U, ~userId, ~imsKi),
+      !IMSI($U, ~userId, ~imsKi),
       !UserICCID(~iccid, ~userId),
+      !HumanMask($U, ~userId, ~initialUserPhoneNumber),
       Out(~initialUserName), Out(~initialUserPhoneNumber)
     ]
 
@@ -53,12 +58,13 @@ rule InitSimSwapWithOperator:
 
     */
 
-    [!Operator(O, opId, 'REDE'),  In(initialUserPhoneNumber),  Fr(~seedK)]
+    [!Operator(O, opId),  MaskPerform(U, ~userId, initialUserPhoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE'), Fr(~seedK)]
 
     --[InitSimSwap(initialUserPhoneNumber, ~seedK)]->
 
     [
         SimSwapINIT(~seedK, opId, initialUserPhoneNumber),
+        MaskReactant(U, ~userId, initialUserPhoneNumber, question(initialUserPhoneNumber, ~seedK)),
         Out(question(initialUserPhoneNumber, ~seedK)),
         Out(~seedK)
     ]  
@@ -69,11 +75,12 @@ rule InitOperatorOnNetwork:
 
        - To simplify, we consider only the operator's ID to create it
     */
-    [Fr(~opId)] 
+    [Fr(~opId), Fr(~aux)] 
 
     --[InitOperator($O, ~opId)]-> 
     
-    [!Operator($O, ~opId, 'REDE')]
+    [!Operator($O, ~opId),
+    !HumanMask($O, ~opId, ~aux)]
 
   
 
