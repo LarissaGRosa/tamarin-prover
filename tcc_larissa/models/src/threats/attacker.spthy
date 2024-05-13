@@ -24,7 +24,7 @@ rule AttackerAnswersQuestion[colour=#C40233]:
    
     [ In(c), !Operator(O, opId), In(initialUserPhoneNumber), In(seedK), Fr(~newICCID), Fr(~pinICCID) ]
     --[ AttackerAnswers(initialUserPhoneNumber, seedK) ]->
-    [SimSwapANSWER(permission(initialUserPhoneNumber, seedK), opId, initialUserPhoneNumber, seedK),
+    [SimSwapANSWER(permission(initialUserPhoneNumber, seedK), opId, initialUserPhoneNumber, seedK, ~pinICCID),
       !UserOnApproveICCID(~newICCID, ~pinICCID,  initialUserPhoneNumber) ]
 
 #else

@@ -5,7 +5,7 @@ restriction Equality:
 
 rule InitUserOnNetwork:
     
-    [ Fr(~iccid), Fr(~imsKi), Fr(~userId), Fr(~initialUserName), Fr(~initialUserPhoneNumber), Fr(~userSecureContact) ]
+    [ Fr(~iccid), Fr(~imsKi), Fr(~userId), Fr(~initialUserName), Fr(~initialUserPhoneNumber), Fr(~userSecureContact)]
     
     --[ InitUser($U, ~userId) ]->
     
@@ -58,9 +58,9 @@ rule InitSimSwapWithOperator:
 
     */
 
-    [!Operator(O, opId),  MaskPerform(U, ~userId, initialUserPhoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE'), Fr(~seedK)]
+    [!Operator(O, opId),  MaskPerform(U, ~userId, initialUserPhoneNumber, action), Fr(~seedK)]
 
-    --[InitSimSwap(initialUserPhoneNumber, ~seedK)]->
+    --[Eq(action, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE'), InitSimSwap(initialUserPhoneNumber, ~seedK)]->
 
     [
         SimSwapINIT(~seedK, opId, initialUserPhoneNumber),
@@ -75,12 +75,11 @@ rule InitOperatorOnNetwork:
 
        - To simplify, we consider only the operator's ID to create it
     */
-    [Fr(~opId), Fr(~aux)] 
+    [Fr(~opId)] 
 
     --[InitOperator($O, ~opId)]-> 
     
-    [!Operator($O, ~opId),
-    !HumanMask($O, ~opId, ~aux)]
+    [!Operator($O, ~opId)]
 
   
 

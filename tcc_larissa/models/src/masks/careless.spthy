@@ -13,7 +13,7 @@
 
 #ifdef SOCIALAUTH
 
-rule UserCareless[colour=#D2BBA0]:
+rule UserCareless[colour=#9578BE]:
     /*
         Here we removed the Eq(<$M,  ~phoneNumber>, <$U, ~initialUserPhoneNumber>) part
         of the code as the careless user dont care to check if he is trying to change the
@@ -25,14 +25,14 @@ rule UserCareless[colour=#D2BBA0]:
 
 #else
 
-rule UserCareless[colour=#D2BBA0]:
+rule UserCareless[colour=#9578BE]:
     [!HumanMask($M, ~userId, ~phoneNumber), !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber)]
     --[CarelessMask($M, ~phoneNumber)]->
     [MaskPerform($M, ~userId, ~initialUserPhoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE')]
 
 #endif
 
-rule AnswerCareless[colour=#D2BBA0]:
+rule AnswerCareless[colour=#9578BE]:
 
     let
         answers = correctAnswer(question(initialUserPhoneNumber, ~seedK))
@@ -41,10 +41,16 @@ rule AnswerCareless[colour=#D2BBA0]:
     --[Eq(<$M, ~userIdM>, <U, ~userId>), AttentiveMask($M, phoneNumber)]->
     [MaskPerform($M, ~userId, phoneNumber, <question, answers>)] 
 
-rule ShowSecretAnswerCareless[colour=#D2BBA0]:
+rule ShowSecretAnswerCareless[colour=#9578BE]:
     let 
         a = answers(~initialUserPhoneNumber, seedK, correctAnswer(question(~initialUserPhoneNumber, seedK)))
     in
     [!HumanMask($M, ~userId, ~initialUserPhoneNumber), In(seedK)]
     --[CarelessMask($M, ~initialUserPhoneNumber)]->
     [MaskPerform($M, ~userId, ~initialUserPhoneNumber, a), Out(a)]
+
+rule chooseSecureContactCareless[colour=#9F7E69]:
+    [MaskReactant(U, ~userId, phoneNumber, <'Select_a_number_for_choose_your_secure_contact', ~pinICCID>), !HumanMask($M, ~userId, initialUserPhoneNumber)]
+    --[CarelessMask($M, phoneNumber)]->
+    [MaskPerform(U, ~userId, phoneNumber, $S), Out_S(U, $S, <'trying_sim_swap', ~pinICCID>)]
+

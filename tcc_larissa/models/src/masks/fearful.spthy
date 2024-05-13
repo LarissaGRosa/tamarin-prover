@@ -12,7 +12,7 @@
 
 #ifdef SOCIALAUTH
 
-rule UserFearful[colour=#F2EFC7]:
+rule UserFearful[colour=#BC8DCF]:
     /* 
         This mask will start the ceremony 
     
@@ -23,17 +23,23 @@ rule UserFearful[colour=#F2EFC7]:
 
 #else
 
-rule UserFearful[colour=#F2EFC7]:
+rule UserFearful[colour=#BC8DCF]:
     [!HumanMask($M, ~userId, ~phoneNumber), !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber)]
     --[Eq(<$M,  ~phoneNumber>, <$U, ~initialUserPhoneNumber>), FearfulMask($M, ~phoneNumber)]->
     [MaskPerform($M, ~userId, ~phoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE')]
 
 #endif
 
-rule AnswerFearful[colour=#F2EFC7]:
+rule AnswerFearful[colour=#BC8DCF]:
     let
         answers = correctAnswer(question(initialUserPhoneNumber, ~seedK))
     in
     [MaskReactant(U, ~userId, phoneNumber, question), !HumanMask($M, ~userId, initialUserPhoneNumber), In(~seedK)]
     --[Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>), FearfulMask($M, phoneNumber)]->
     [MaskPerform($M, ~userId, phoneNumber, <question, 'WHY_SHOULD_I_ANSWER_THAT'>)]
+
+rule chooseSecureContactFearful[colour=#9F7E69]:
+    [MaskReactant(U, ~userId, phoneNumber, <'Select_a_number_for_choose_your_secure_contact', ~pinICCID>), !HumanMask($M, ~userId, initialUserPhoneNumber)]
+    --[Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>), FearfulMask($M, phoneNumber)]->
+    [MaskPerform(U, ~userId, phoneNumber, $S)]
+
