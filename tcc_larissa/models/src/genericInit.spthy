@@ -6,7 +6,7 @@ restriction Equality:
 rule InitUserOnNetwork:
     
     [ 
-      Fr(~userId), Fr(~userName), Fr(~phoneNumber), Fr(~userSecureContact)
+      Fr(~userId), Fr(~userName), Fr(~phoneNumber), Fr(~userSecureContact), Fr(~secureId)
     ]
     
     --[ InitUser($U, ~userId, ~phoneNumber) ]->
@@ -14,6 +14,7 @@ rule InitUserOnNetwork:
     [ 
       !MNOAccount($U, ~userId, ~userName, ~phoneNumber, ~userSecureContact), 
       !HumanMask($U, ~userId, ~phoneNumber),
+      !HumanMask($N, ~secureId, ~userSecureContact),
       Out(~userName), Out(~phoneNumber)
     ]
 

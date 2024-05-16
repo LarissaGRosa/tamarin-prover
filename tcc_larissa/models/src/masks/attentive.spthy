@@ -27,52 +27,50 @@ rule UserAttentive[colour=#AC8BDB]:
 
 rule AnswerAttentive[colour=#AC8BDB]:
     let
-        answers = correctAnswer(question(initialUserPhoneNumber, ~seedK))
+        answers = correctAnswer(question(phoneNumber, ~seedK))
     in
     [
-        MaskReactant(U, ~userId, phoneNumber, question), 
-        !HumanMask($M, ~userId, initialUserPhoneNumber), 
+    
+        MaskReactant(M, userId, phoneNumber, question), 
+        !HumanMask(M, userId, phoneNumber), 
         In(~seedK)
     ]
     --[
-        Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>), 
-        AttentiveMask($M, phoneNumber)
+        Eq(question, question(phoneNumber, ~seedK)), 
+        AnswerAttentiveAttentiveMask(M, phoneNumber)
     ]->
     [
-        MaskPerform($M, ~userId, phoneNumber, <question, answers>)
+        MaskPerform(M, userId, phoneNumber, <question, answers>)
     ]
 
-rule secureContactAttentive[colour=#AC8BDB]:
+rule secureContactAttentive[colour=#9F2B68]:
     let
         getPin = getSentPin(userSecureContactMessage)
     in
     [
-        !MNOAccount(U, userId, userName, phoneNumber, userSecureContact), 
-        In_S($N,$S,userSecureContactMessage),
-        Fr(~secureId)
-    ]
-    --[AttentiveMask($N, userSecureContact)]->
-    [
+        !MNOAccount(U, userId, userName, phoneNumber, userSecureContacts), 
         !HumanMask($N, ~secureId, userSecureContact),
-        MaskReactant(U, userId, phoneNumber, <'is_this_your_pin', getPin, userSecureContact>)
+        In_S($N,$S,userSecureContactMessage)
+    ]
+    --[Eq(userSecureContacts, userSecureContact), AttentiveMask($N, userSecureContact)]->
+    [
+        MaskReactant(U, userId, phoneNumber, <'is_this_your_pin', getPin>)
     ]
 
-rule secureContactAsksUserAttentive[colour=#AC8BDB]:
+rule userAttentiveAnswersSecureContact[colour=#AC8BDB]:
     [
         !MNOAccount(U, userId, userName, phoneNumber, userSecureContact), 
-        MaskReactant(U, userId, phoneNumber, <action, pinICCID, secureContact>), 
+        MaskReactant(U, userId, phoneNumber, <action, pinICCID>), 
         !HumanMask($M, ~userId1, initialUserPhoneNumber),
         UserCreatedRequest(userId, phoneNumber, <seedK, pinICCID1, newICCID>)
     ]
-    --[Eq(action, 'is_this_your_pin'), Eq(pinICCID1, pinICCID), Eq(userSecureContact, secureContact), Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>),  Eq(<$M,  ~userId1>, <U, userId>), AttentiveMask($M, phoneNumber)]->
-    [MaskReactant(U, userId, phoneNumber, <'accept_this_pin', pinICCID>)]
+    --[Eq(action, 'is_this_your_pin'), Eq(pinICCID1, pinICCID), Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>),  Eq(<$M,  ~userId1>, <U, userId>), AttentiveMask($M, phoneNumber)]->
+    [MaskReactant(U, userId, userSecureContact, <'accept_this_pin', pinICCID>)]
 
-rule acceptUserPINAttentive[colour=#AC8BDB]:
-    let
-        getPin = getSentPin(userSecureContactMessage)
-    in
-    [MaskReactant($N, userId, userSecureContact, <action, ~pinICCID>), !HumanMask($N, ~secureId, userSecureContacts), In_S($N1,$S,userSecureContactMessage)]
-    --[Eq(~pinICCID, getPin), Eq('accept_this_pin', action), Eq(userSecureContacts, userSecureContact)]->
+rule acceptUserPINAttentive[colour=#9F2B68]:
+
+    [MaskReactant($N, userId, userSecureContact, <action, ~pinICCID>), !HumanMask($N, ~secureId, userSecureContacts)]
+    --[Eq('accept_this_pin', action), Eq(userSecureContacts, userSecureContact)]->
     [MaskPerform($N, ~secureId, userSecureContacts, <'confirms_pin', ~pinICCID>)]
 
 
@@ -92,8 +90,6 @@ rule AnswerAttentive[colour=#AC8BDB]:
     [MaskPerform($M, ~userId, phoneNumber, <question, answers>)]
 
 #endif
-
-
 
 
 

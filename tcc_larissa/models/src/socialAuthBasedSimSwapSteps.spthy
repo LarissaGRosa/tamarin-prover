@@ -33,9 +33,7 @@ rule AnswerSimSwapToMNO:
         Fr(~newICCID), Fr(~pinICCID)
     ]
     --[
-        Eq(answers, permission(phoneNumber, seedK)),
-        Eq(phoneNumber, initialUserPhoneNumber), 
-        Eq(question(initialUserPhoneNumber, seedK), question), 
+        Eq(a, permission(phoneNumber, seedK)),
         AnswerSimSwap(initialUserPhoneNumber, seedK)
     ]->
     [
@@ -43,7 +41,7 @@ rule AnswerSimSwapToMNO:
         UserCreatedRequest(userId, phoneNumber, <seedK, ~pinICCID, ~newICCID>)
     ]
 
-    
+   
 rule MNOsendsMessageToRandomSecureContact:
     let
       userSecureContactMessage = sendConfirmationToSecureContact(phoneNumber, ~random, pinICCID)
@@ -71,8 +69,9 @@ rule SecureContactComparesPinAndFinishSimSwap:
     [
         FinishSwap(phoneNumber, pinICCID, seedK, newICCID)
     ]
-
+/*
 rule FinishSimSwapOnNetwork:
     [FinishSwap(initialUserPhoneNumber, pinICCID1, seedK, newICCID)]
     --[FinishSimSwap(initialUserPhoneNumber, seedK)]->
     [ !UserICCID(newICCID, initialUserPhoneNumber)]
+*/
