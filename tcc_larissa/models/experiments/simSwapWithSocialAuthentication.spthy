@@ -16,7 +16,7 @@ lemma Sim_swap_finish_honest:
       ==>
         /* tem um usuário que respondeu a requisição */
       ( (
-        Ex #j. ConfirmsPinSimSwap(phoneNumber, seedK) @ j 
+        Ex #j. AnswerSimSwap(phoneNumber, seedK) @ j 
         & j < i
         )
       )
@@ -29,7 +29,7 @@ lemma Sim_swap_finish_honest_or_attack:
        ==>
          /* tem um usuário que respondeu a requisição */
        ( (
-          Ex #j. ConfirmsPinSimSwap(phoneNumber, seedK) @ j 
+          Ex #j.  AnswerSimSwap(phoneNumber, seedK) @ j 
           & j < i
          )
          /* ou o adversário fez um ataque as perguntas de segurança */
@@ -44,7 +44,7 @@ lemma Sim_swap_finish_honest_or_attack_or_operator:
        ==>
          /* tem um usuário que respondeu a requisição */
        ( (
-          Ex #j. ConfirmsPinSimSwap(phoneNumber, seedK) @ j 
+          Ex #j. AnswerSimSwap(phoneNumber, seedK) @ j 
           & j < i
          )
          /* ou o adversário fez um ataque as perguntas de segurança */

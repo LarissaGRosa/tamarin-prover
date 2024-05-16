@@ -5,18 +5,43 @@ restriction Equality:
 
 rule InitUserOnNetwork:
     
-    [ Fr(~iccid), Fr(~imsKi), Fr(~userId), Fr(~initialUserName), Fr(~initialUserPhoneNumber), Fr(~userSecureContact)]
+    [ 
+      Fr(~userId), Fr(~userName), Fr(~phoneNumber), Fr(~userSecureContact)
+    ]
     
-    --[ InitUser($U, ~userId) ]->
+    --[ InitUser($U, ~userId, ~phoneNumber) ]->
     
-    [ !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber, ~userSecureContact), 
-      !IMSI($U, ~userId, ~imsKi),
-      !UserICCID(~iccid, ~userId),
-      !HumanMask($U, ~userId, ~initialUserPhoneNumber),
-      Out(~initialUserName), Out(~initialUserPhoneNumber)
+    [ 
+      !MNOAccount($U, ~userId, ~userName, ~phoneNumber, ~userSecureContact), 
+      !HumanMask($U, ~userId, ~phoneNumber),
+      Out(~userName), Out(~phoneNumber)
     ]
 
+rule InitMNORepresentativeOnNetwork:
 
+    [
+      Fr(~repId)
+    ] 
+    --[InitMNORepresentative($O, ~repId)]-> 
+    [
+      !MNORepresentative($O, ~repId)
+    ]
+
+rule InitSimSwapWithMNORepresentative:
+  
+    [
+      !MNORepresentative(O, repId),  MaskPerform(U, userId, phoneNumber, action), Fr(~seedK)
+    ]
+
+    --[Eq(action, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE'), InitSimSwap(U, phoneNumber, ~seedK)]->
+
+    [
+        Status('INIT', repId, userId, phoneNumber, ~seedK),
+        MaskReactant(U, userId, phoneNumber, question(phoneNumber, ~seedK)),
+        Out(question(phoneNumber, ~seedK)),
+        Out(~seedK)
+    ]  
+    
 #else
 rule InitUserOnNetwork:
     /*
@@ -42,8 +67,17 @@ rule InitUserOnNetwork:
       Out(~initialUserName), Out(~initialUserPhoneNumber)
     ]
 
-#endif
+rule InitOperatorOnNetwork:
+    /*
+       REGISTER AN ARBITRARY OPERATOR OP IN THE TELEPHONE NETWORK R
 
+       - To simplify, we consider only the operator's ID to create it
+    */
+    [Fr(~opId)] 
+
+    --[InitOperator($O, ~opId)]-> 
+    
+    [!Operator($O, ~opId)]
 
 rule InitSimSwapWithOperator:
     /*
@@ -69,17 +103,12 @@ rule InitSimSwapWithOperator:
         Out(~seedK)
     ]  
     
-rule InitOperatorOnNetwork:
-    /*
-       REGISTER AN ARBITRARY OPERATOR OP IN THE TELEPHONE NETWORK R
 
-       - To simplify, we consider only the operator's ID to create it
-    */
-    [Fr(~opId)] 
+#endif
 
-    --[InitOperator($O, ~opId)]-> 
-    
-    [!Operator($O, ~opId)]
+
+
+
 
   
 

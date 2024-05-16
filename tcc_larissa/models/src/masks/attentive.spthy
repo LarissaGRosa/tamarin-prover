@@ -13,21 +13,61 @@
 #ifdef SOCIALAUTH
 
 rule UserAttentive[colour=#AC8BDB]:
-    [!HumanMask($M, ~userId, ~phoneNumber), !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber, userSecureContacts)]
-    --[Eq(<$M,  ~phoneNumber>, <$U, ~initialUserPhoneNumber>), AttentiveMask($M, ~phoneNumber)]->
-    [MaskPerform($M, ~userId, ~phoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE')]
+    [
+        !HumanMask($M, ~userId, ~phoneNumber), 
+        !MNOAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber, ~userSecureContact)
+    ]
+    --[
+        Eq(<$M,  ~phoneNumber>, <$U, ~initialUserPhoneNumber>), 
+        AttentiveMask($M, ~phoneNumber)
+    ]->
+    [
+        MaskPerform($M, ~userId, ~phoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE')
+    ]
 
-rule SecureContactAttentive[colour=#AC8BDB]:
-    [!UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber, userSecureContacts), Fr(~secureId)]
-    --[AttentiveMask($N, userSecureContacts)]->
-    [!HumanMask($N, ~secureId, userSecureContacts)]
+rule AnswerAttentive[colour=#AC8BDB]:
+    let
+        answers = correctAnswer(question(initialUserPhoneNumber, ~seedK))
+    in
+    [
+        MaskReactant(U, ~userId, phoneNumber, question), 
+        !HumanMask($M, ~userId, initialUserPhoneNumber), 
+        In(~seedK)
+    ]
+    --[
+        Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>), 
+        AttentiveMask($M, phoneNumber)
+    ]->
+    [
+        MaskPerform($M, ~userId, phoneNumber, <question, answers>)
+    ]
 
-rule chooseSecureContactAttentive[colour=#AC8BDB]:
-    [MaskReactant(U, ~userId, phoneNumber, <action, ~pinICCID>), !HumanMask($M, ~userId1, initialUserPhoneNumber), Fr(~randomNumber)]
-    --[Eq(action, 'Select_a_number_for_choose_your_secure_contact'), Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>),  Eq(<$M,  ~userId1>, <U, ~userId>), AttentiveMask($M, phoneNumber)]->
-    [MaskPerform(U, ~userId, phoneNumber, <'choose_random_secure_contact', ~randomNumber>)]
+rule secureContactAttentive[colour=#AC8BDB]:
+    let
+        getPin = getSentPin(userSecureContactMessage)
+    in
+    [
+        !MNOAccount(U, userId, userName, phoneNumber, userSecureContact), 
+        In_S($N,$S,userSecureContactMessage),
+        Fr(~secureId)
+    ]
+    --[AttentiveMask($N, userSecureContact)]->
+    [
+        !HumanMask($N, ~secureId, userSecureContact),
+        MaskReactant(U, userId, phoneNumber, <'is_this_your_pin', getPin, userSecureContact>)
+    ]
 
-rule acceptUserPIN[colour=#AC8BDB]:
+rule secureContactAsksUserAttentive[colour=#AC8BDB]:
+    [
+        !MNOAccount(U, userId, userName, phoneNumber, userSecureContact), 
+        MaskReactant(U, userId, phoneNumber, <action, pinICCID, secureContact>), 
+        !HumanMask($M, ~userId1, initialUserPhoneNumber),
+        UserCreatedRequest(userId, phoneNumber, <seedK, pinICCID1, newICCID>)
+    ]
+    --[Eq(action, 'is_this_your_pin'), Eq(pinICCID1, pinICCID), Eq(userSecureContact, secureContact), Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>),  Eq(<$M,  ~userId1>, <U, userId>), AttentiveMask($M, phoneNumber)]->
+    [MaskReactant(U, userId, phoneNumber, <'accept_this_pin', pinICCID>)]
+
+rule acceptUserPINAttentive[colour=#AC8BDB]:
     let
         getPin = getSentPin(userSecureContactMessage)
     in
@@ -43,8 +83,6 @@ rule UserAttentive[colour=#AC8BDB]:
     --[Eq(<$M,  ~phoneNumber>, <$U, ~initialUserPhoneNumber>), AttentiveMask($M, ~phoneNumber)]->
     [MaskPerform($M, ~userId, ~phoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE')]
 
-#endif
-
 rule AnswerAttentive[colour=#AC8BDB]:
     let
         answers = correctAnswer(question(initialUserPhoneNumber, ~seedK))
@@ -52,6 +90,10 @@ rule AnswerAttentive[colour=#AC8BDB]:
     [MaskReactant(U, ~userId, phoneNumber, question), !HumanMask($M, ~userId, initialUserPhoneNumber), In(~seedK)]
     --[Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>), AttentiveMask($M, phoneNumber)]->
     [MaskPerform($M, ~userId, phoneNumber, <question, answers>)]
+
+#endif
+
+
 
 
 

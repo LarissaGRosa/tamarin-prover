@@ -9,23 +9,22 @@ rule SecretQuestionAttacked[colour=#BE2444]:
 
 */
 let 
-    c = answers(initialUserPhoneNumber, seedK, correctAnswer(question(initialUserPhoneNumber, seedK)))
+    c = answers(phoneNumber, seedK, correctAnswer(question(phoneNumber, seedK)))
 in
 
-[!UserAccount(R, userId, initialUserName, initialUserPhoneNumber, userSecureContact), In(seedK)]
+[!MNOAccount(U, userId, userName, phoneNumber, userSecureContact), In(seedK)]
 
---[QuestionAttack(initialUserPhoneNumber, seedK)]->
-[Out(c)]
+--[QuestionAttack(phoneNumber, seedK)]->
+[Out(c), Out(userId)]
 
 rule AttackerAnswersQuestion[colour=#C40233]:
     let 
-      c = answers(initialUserPhoneNumber, seedK, correctAnswer(question(initialUserPhoneNumber, seedK)))
+      c = answers(phoneNumber, seedK, correctAnswer(question(phoneNumber, seedK)))
     in
    
-    [ In(c), !Operator(O, opId), In(initialUserPhoneNumber), In(seedK), Fr(~newICCID), Fr(~pinICCID) ]
-    --[ AttackerAnswers(initialUserPhoneNumber, seedK) ]->
-    [SimSwapANSWER(permission(initialUserPhoneNumber, seedK), opId, initialUserPhoneNumber, seedK, ~pinICCID),
-      !UserOnApproveICCID(~newICCID, ~pinICCID,  initialUserPhoneNumber) ]
+    [ In(c), !MNORepresentative(O, repId),In(userId), In(phoneNumber), In(seedK), Fr(~newICCID), Fr(~pinICCID) ]
+    --[ AttackerAnswers(phoneNumber, seedK) ]->
+    [Status('AUTH_COMPLETED', repId, userId, phoneNumber, <seedK, ~pinICCID, ~newICCID>) ]
 
 #else
 
