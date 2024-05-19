@@ -1,7 +1,7 @@
 restriction Equality:
   "All x y #i. Eq(x,y) @i ==> x = y"
 
-#ifdef SOCIALAUTH
+
 
 rule InitUserOnNetwork:
     
@@ -43,69 +43,7 @@ rule InitSimSwapWithMNORepresentative:
         Out(~seedK)
     ]  
     
-#else
-rule InitUserOnNetwork:
-    /*
-   
-      REGISTER AN ARBITRARY USER U IN THE TELEPHONE NETWORK R
-      
-      - We consider a user containing a SIM and an account;
-      - We need to generate an ID (here as a random value) for their account and for 
-        the identifier of their chip. Furthermore, each user has an IMSI containing digits of their country,
-        network, and user in the system, in addition to a verification key. 
-      - The IMSI is anchored to the account and the ICCID to the chip 
-      - SIM Swap is swapping the connection between UserICCID to a newly generated ICCID
 
-    */
-    [ Fr(~iccid), Fr(~imsKi), Fr(~userId), Fr(~initialUserName), Fr(~initialUserPhoneNumber) ]
-    
-    --[ InitUser($U, ~userId) ]->
-    
-    [ !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber), 
-      !IMSI($U, ~userId, ~imsKi),
-      !UserICCID(~iccid, ~userId),
-      !HumanMask($U, ~userId, ~initialUserPhoneNumber),
-      Out(~initialUserName), Out(~initialUserPhoneNumber)
-    ]
-
-rule InitOperatorOnNetwork:
-    /*
-       REGISTER AN ARBITRARY OPERATOR OP IN THE TELEPHONE NETWORK R
-
-       - To simplify, we consider only the operator's ID to create it
-    */
-    [Fr(~opId)] 
-
-    --[InitOperator($O, ~opId)]-> 
-    
-    [!Operator($O, ~opId)]
-
-rule InitSimSwapWithOperator:
-    /*
-   
-        INITIATES SIM SWAP OF A USER U, BY AN OPERATOR O, IN A NETWORK R
-       
-        - Receives the data related to the phone number (initialUserPhoneNumber and initialUserName);
-        - Sends this data to a pre-registered operator in network R;
-        - Generates a seed K that selects a question Q from the network to verify the user's identity
-        - Generates a log of the action on the network by the phone number and the seed K,
-        - The operator makes the question available on the insecure network
-
-    */
-
-    [!Operator(O, opId),  MaskPerform(U, ~userId, initialUserPhoneNumber, action), Fr(~seedK)]
-
-    --[Eq(action, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE'), InitSimSwap(initialUserPhoneNumber, ~seedK)]->
-
-    [
-        SimSwapINIT(~seedK, opId, initialUserPhoneNumber),
-        MaskReactant(U, ~userId, initialUserPhoneNumber, question(initialUserPhoneNumber, ~seedK)),
-        Out(question(initialUserPhoneNumber, ~seedK)),
-        Out(~seedK)
-    ]  
-    
-
-#endif
 
 
 

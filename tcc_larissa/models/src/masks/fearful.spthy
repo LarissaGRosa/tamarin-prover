@@ -2,7 +2,7 @@
    
       FEARFUL HUMAN MASK
       
-      - We consider this to be the attentive mask of actions that can be taken by the user U;
+      - We consider this to be the Fearful mask of actions that can be taken by the user U;
       - For this, the user should be honest, so we consider it has an account in the MNO;
       - He will not trust his personal data and the ceremony as a whole;
         
@@ -10,36 +10,71 @@
 
 */
 
-#ifdef SOCIALAUTH
-
 rule UserFearful[colour=#BC8DCF]:
-    /* 
-        This mask will start the ceremony 
-    
-    */
-    [!HumanMask($M, ~userId, ~phoneNumber), !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber, ~userSecureContact)]
-    --[Eq(<$M,  ~phoneNumber>, <$U, ~initialUserPhoneNumber>), FearfulMask($M, ~phoneNumber)]->
-    [MaskPerform($M, ~userId, ~phoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE')]
-
-#else
-
-rule UserFearful[colour=#BC8DCF]:
-    [!HumanMask($M, ~userId, ~phoneNumber), !UserAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber)]
-    --[Eq(<$M,  ~phoneNumber>, <$U, ~initialUserPhoneNumber>), FearfulMask($M, ~phoneNumber)]->
-    [MaskPerform($M, ~userId, ~phoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE')]
-
-#endif
+    [
+        !HumanMask($M, ~userId, ~phoneNumber), 
+        !MNOAccount($U, ~userId, ~initialUserName, ~initialUserPhoneNumber, ~userSecureContact)
+    ]
+    --[ Eq(<$M,  ~phoneNumber>, <$U, ~initialUserPhoneNumber>), FearfulMask($M, ~phoneNumber) ]->
+    [
+        MaskPerform($M, ~userId, ~phoneNumber, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE')
+    ]
 
 rule AnswerFearful[colour=#BC8DCF]:
     let
-        answers = correctAnswer(question(initialUserPhoneNumber, ~seedK))
+        answers = correctAnswer(question(phoneNumber, ~seedK))
     in
-    [MaskReactant(U, ~userId, phoneNumber, question), !HumanMask($M, ~userId, initialUserPhoneNumber), In(~seedK)]
-    --[Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>), FearfulMask($M, phoneNumber)]->
-    [MaskPerform($M, ~userId, phoneNumber, <question, 'WHY_SHOULD_I_ANSWER_THAT'>)]
+    [
+        MaskReactant(M, userId, phoneNumber, question), 
+        !HumanMask(M, userId, phoneNumber), 
+        In(~seedK)
+    ]
+    --[ Eq(question, question(phoneNumber, ~seedK)), AnswerFearfulFearfulMask(M, phoneNumber) ]->
+    [
+        MaskPerform(M, userId, phoneNumber, <question, 'why_do_you_need_this_info'>)
+    ]
+    
+#ifdef SOCIALAUTH
+rule secureContactFearful[colour=#9F2B68]:
+    let
+        getPin = getSentPin(userSecureContactMessage)
+    in
+    [
+        !MNOAccount(U, userId, userName, phoneNumber, userSecureContacts), 
+        !HumanMask($N, ~secureId, userSecureContact),
+        In_S($N,$S,userSecureContactMessage),
+        Fr(~randomPin)
+    ]
+    --[ Eq(userSecureContacts, userSecureContact), FearfulMask($N, userSecureContact) ]->
+    [
+        MaskReactant(U, userId, phoneNumber, <'what_is_your_pin', ~randomPin>)
+    ]
 
-rule chooseSecureContactFearful[colour=#9F7E69]:
-    [MaskReactant(U, ~userId, phoneNumber, <'Select_a_number_for_choose_your_secure_contact', ~pinICCID>), !HumanMask($M, ~userId, initialUserPhoneNumber)]
-    --[Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>), FearfulMask($M, phoneNumber)]->
-    [MaskPerform(U, ~userId, phoneNumber, $S)]
+rule userFearfulAnswersSecureContact[colour=#BC8DCF]:
+    [
+        !MNOAccount(U, userId, userName, phoneNumber, userSecureContact), 
+        MaskReactant(U, userId, phoneNumber, <action, pinICCID>), 
+        !HumanMask($M, ~userId1, initialUserPhoneNumber),
+        UserCreatedRequest(userId, phoneNumber, <seedK, pinICCID1, newICCID>)
+    ]
+    --[ Eq(action, 'what_is_your_pin'), Eq(pinICCID1, pinICCID), 
+        Eq(<$M,  phoneNumber>, <U, initialUserPhoneNumber>),  
+        Eq(<$M,  ~userId1>, <U, userId>), FearfulMask($M, phoneNumber)
+    ]->
+    [
+        MaskReactant(U, userId, userSecureContact, <'dont_accept_this_pin', pinICCID>)
+    ]
+
+rule acceptUserPINFearful[colour=#9F2B68]:
+    [ 
+        MaskReactant($N, userId, userSecureContact, <action, ~pinICCID>), 
+        !HumanMask($N, ~secureId, userSecureContacts)
+    ]
+    --[ Eq('dont_accept_this_pin', action), Eq(userSecureContacts, userSecureContact) ]->
+    [
+        MaskPerform($N, ~secureId, userSecureContacts, <'cannot_confirm_pin', ~pinICCID>)
+    ]
+#endif
+
+
 

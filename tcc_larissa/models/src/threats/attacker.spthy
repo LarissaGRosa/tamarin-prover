@@ -1,6 +1,3 @@
-#ifdef SOCIALAUTH
-    
-rule SecretQuestionAttacked[colour=#BE2444]:
 /*
   RULE OF ASSISTANCE TO ATTACKER 1
 
@@ -8,51 +5,48 @@ rule SecretQuestionAttacked[colour=#BE2444]:
     through an attack on the database or social engineering.
 
 */
-let 
-    c = answers(phoneNumber, seedK, correctAnswer(question(phoneNumber, seedK)))
-in
+    
+rule SecretQuestionAttacked[colour=#BE2444]:
+  let 
+      c = answers(phoneNumber, seedK, correctAnswer(question(phoneNumber, seedK)))
+  in
+  [
+    !MNOAccount(U, userId, userName, phoneNumber, userSecureContact), In(seedK)
+  ]
+  --[ QuestionAttack(phoneNumber, seedK) ]->
+  [
+    Out(c), Out(userId)
+  ]
 
-[!MNOAccount(U, userId, userName, phoneNumber, userSecureContact), In(seedK)]
-
---[QuestionAttack(phoneNumber, seedK)]->
-[Out(c), Out(userId)]
-
+#ifdef SOCIALAUTH
 rule AttackerAnswersQuestion[colour=#C40233]:
     let 
       c = answers(phoneNumber, seedK, correctAnswer(question(phoneNumber, seedK)))
     in
-   
-    [ In(c), !MNORepresentative(O, repId),In(userId), In(phoneNumber), In(seedK), Fr(~newICCID), Fr(~pinICCID) ]
+    [ 
+      In(c), !MNORepresentative(O, repId), 
+      In(userId), In(phoneNumber), In(seedK), 
+      Fr(~newICCID), Fr(~pinICCID) 
+    ]
     --[ AttackerAnswers(phoneNumber, seedK) ]->
-    [Status('AUTH_COMPLETED', repId, userId, phoneNumber, <seedK, ~pinICCID, ~newICCID>) ]
-
+    [
+      Status('AUTH_COMPLETED', repId, userId, phoneNumber, <seedK, ~pinICCID, ~newICCID>) 
+    ]
 #else
-
-rule SecretQuestionAttacked[colour=#BE2444]:
-    /*
-      RULE OF ASSISTANCE TO ATTACKER 1
-
-      - In this rule, the attacker manages to uncover the answers to the user's questions
-        through an attack on the database or social engineering.
-    
-    */
-    let 
-        c = answers(initialUserPhoneNumber, seedK, correctAnswer(question(initialUserPhoneNumber, seedK)))
-    in
-    
-    [!UserAccount(R, userId, initialUserName, initialUserPhoneNumber), In(seedK)]
-  
-    --[QuestionAttack(initialUserPhoneNumber, seedK)]->
-    [Out(c)]
-
 rule AttackerAnswersQuestion[colour=#C40233]:
     let 
-      c = answers(initialUserPhoneNumber, seedK, correctAnswer(question(initialUserPhoneNumber, seedK)))
+      c = answers(phoneNumber, seedK, correctAnswer(question(phoneNumber, seedK)))
     in
-   
-    [ In(c), !Operator(O, opId), In(initialUserPhoneNumber), In(seedK) ]
-    --[ AttackerAnswers(initialUserPhoneNumber, seedK) ]->
-    [SimSwapANSWER(permission(initialUserPhoneNumber, seedK), opId, initialUserPhoneNumber, seedK) ]
+    [ 
+      In(c), !MNORepresentative(O, repId), 
+      In(userId), In(phoneNumber), In(seedK), 
+      Fr(~newICCID), Fr(~pinICCID) 
+    ]
+    --[ AttackerAnswers(phoneNumber, seedK) ]->
+    [
+      Status('AUTH_COMPLETED', repId, userId, phoneNumber, <seedK>) 
+    ]
 
-#endif 
+#endif
+
 

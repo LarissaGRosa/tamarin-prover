@@ -7,13 +7,10 @@ equations:
 
 
 rule InitSimSwapWithMNORepresentative:
-  
     [
       !MNORepresentative(O, repId),  MaskPerform(U, userId, phoneNumber, action), Fr(~seedK)
     ]
-
     --[Eq(action, 'CALL_CUSTOMER_SERVICE_REPRESENTATIVE'), InitSimSwap(U, phoneNumber, ~seedK)]->
-
     [
         Status('INIT', repId, userId, phoneNumber, ~seedK),
         MaskReactant(U, userId, phoneNumber, question(phoneNumber, ~seedK)),
@@ -22,7 +19,6 @@ rule InitSimSwapWithMNORepresentative:
     ]  
 
 rule AnswerSimSwapToMNO:
-   
     let 
         a = answers(initialUserPhoneNumber, seedK, answers)
     in
@@ -32,16 +28,12 @@ rule AnswerSimSwapToMNO:
         MaskPerform(U, userId, phoneNumber, <question, answers>),
         Fr(~newICCID), Fr(~pinICCID)
     ]
-    --[
-        Eq(a, permission(phoneNumber, seedK)),
-        AnswerSimSwap(initialUserPhoneNumber, seedK)
-    ]->
+    --[ Eq(a, permission(phoneNumber, seedK)), AnswerSimSwap(initialUserPhoneNumber, seedK)]->
     [
         Status('AUTH_COMPLETED', repId, userId, phoneNumber, <seedK, ~pinICCID, ~newICCID>),
         UserCreatedRequest(userId, phoneNumber, <seedK, ~pinICCID, ~newICCID>)
     ]
-
-   
+ 
 rule MNOsendsMessageToRandomSecureContact:
     let
       userSecureContactMessage = sendConfirmationToSecureContact(phoneNumber, ~random, pinICCID)
@@ -50,9 +42,8 @@ rule MNOsendsMessageToRandomSecureContact:
         Status('AUTH_COMPLETED', repId, userId, phoneNumber, <seedK, pinICCID, newICCID>), 
         Fr(~random)
     ]
-    --[ SendMessageSimSwap(phoneNumber, ~random)]->
+    --[ SendMessageSimSwap(phoneNumber, ~random) ]->
     [ 
-      
       Out_S($N,$S,userSecureContactMessage),
       Status('CONFIRMATION_SENT', repId, userId, phoneNumber, <seedK, pinICCID, newICCID>)
     ]
@@ -62,16 +53,16 @@ rule SecureContactComparesPinAndFinishSimSwap:
         MaskPerform($N, ~secureId, userSecureContacts, <action, pinICCID>),  
         Status('CONFIRMATION_SENT', repId, userId, phoneNumber, <seedK, pinICCID, newICCID>)
     ]
-    --[
-        Eq(action, 'confirms_pin'), 
-        ConfirmsPinSimSwap(phoneNumber, seedK)
-    ]->
+    --[ Eq(action, 'confirms_pin'), ConfirmsPinSimSwap(phoneNumber, seedK)]->
     [
         FinishSwap(phoneNumber, pinICCID, seedK, newICCID)
     ]
-/*
+
 rule FinishSimSwapOnNetwork:
-    [FinishSwap(initialUserPhoneNumber, pinICCID1, seedK, newICCID)]
-    --[FinishSimSwap(initialUserPhoneNumber, seedK)]->
-    [ !UserICCID(newICCID, initialUserPhoneNumber)]
-*/
+    [
+        FinishSwap(phoneNumber, pinICCID, seedK, newICCID)
+    ]
+    --[ FinishSimSwap(phoneNumber, seedK) ]->
+    [ 
+        !UserICCID(newICCID, phoneNumber)
+    ]

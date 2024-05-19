@@ -1,39 +1,33 @@
 #ifdef SOCIALAUTH
 rule InitDishonestOperatorSimSwap[colour=#FDBE87]:
-  [OperatorC(O, repId), In(phoneNumber), In(userId), Fr(~seedK), Fr(~pinICCID), Fr(~newICCID)]
-  --[InitCorruptedSimSwap(phoneNumber, ~seedK)]->
+  [
+    OperatorC(O, repId), In(phoneNumber), In(userId), Fr(~seedK), Fr(~pinICCID), Fr(~newICCID)
+  ]
+  --[ InitCorruptedSimSwap(phoneNumber, ~seedK) ]->
   [
     Status('AUTH_COMPLETED', repId, userId, phoneNumber, <~seedK, ~pinICCID, ~newICCID>)
   ]
-
-rule AttackerHelperOperator[colour=#FF6600]:
-    /*
-        Modifies an honest operator into a dishonest operator who will assist the attacker
-
-    */
-    [!MNORepresentative(O, repId)] 
-
-    --[CorruptedMNO(O, repId)]-> 
-
-    [OperatorC(O, repId)]
-
-
 #else
 rule InitDishonestOperatorSimSwap[colour=#FDBE87]:
-  [OperatorC(O, opId), In(initialUserPhoneNumber),  Fr(~seedK), Fr(~newICCID)]
-  --[InitCorruptedSimSwap(initialUserPhoneNumber, ~seedK)]->
   [
-    FinishAnswer(~newICCID, initialUserPhoneNumber, ~seedK)
+    OperatorC(O, repId), In(phoneNumber), In(userId), Fr(~seedK), Fr(~pinICCID), Fr(~newICCID)
   ]
+  --[ InitCorruptedSimSwap(phoneNumber, ~seedK) ]->
+  [
+    Status('AUTH_COMPLETED', repId, userId, phoneNumber, <~seedK>)
+  ]
+
+#endif
 
 rule AttackerHelperOperator[colour=#FF6600]:
     /*
         Modifies an honest operator into a dishonest operator who will assist the attacker
 
     */
-    [!Operator(O, opId)] 
-
-    --[CorruptedOperator(O, opId)]-> 
-
-    [OperatorC(O, opId)]
-#endif
+    [
+      !MNORepresentative(O, repId)
+    ] 
+    --[ CorruptedMNO(O, repId) ]-> 
+    [
+      OperatorC(O, repId)
+    ]
