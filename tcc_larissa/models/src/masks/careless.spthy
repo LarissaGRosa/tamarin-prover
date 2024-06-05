@@ -36,6 +36,17 @@ rule AnswerCareless[colour=#9578BE]:
         MaskPerform(M, userId, phoneNumber, <question, answers>)
     ]
 
+rule RepresentativeCareless[colour=#AC8BDB]:
+    let 
+        a = answers(phoneNumber, seedK, answers)
+    in
+    [ 
+        Status('INIT', repId, userId, phoneNumber, seedK), 
+        MaskPerform(U, userId, phoneNumberH, <question, answers>),
+        !HumanMask(O, repIdH, repIdH)]
+    --[Eq(repIdH, repId), Eq(phoneNumber, phoneNumberH)]->
+    [MaskPerform(O, repIdH, repIdH, <'REPRESENTATIVE_CONFIRMS', phoneNumber>)]
+
 #ifdef SOCIALAUTH
 rule secureContactCareless[colour=#9F2B68]:
     let
