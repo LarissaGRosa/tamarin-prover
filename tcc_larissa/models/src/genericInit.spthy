@@ -25,7 +25,8 @@ rule InitMNORepresentativeOnNetwork:
     ] 
     --[InitMNORepresentative($O, ~repId)]-> 
     [
-      !MNORepresentative($O, ~repId)
+      !MNORepresentative($O, ~repId),
+      !HumanMask($O, ~repId, ~repId), 
     ]
 
 rule InitSimSwapWithMNORepresentative:

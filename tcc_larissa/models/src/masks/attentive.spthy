@@ -36,6 +36,16 @@ rule AnswerAttentive[colour=#AC8BDB]:
         MaskPerform(M, userId, phoneNumber, <question, answers>)
     ]
 
+rule RepresentativeAttentive[colour=#AC8BDB]:
+    let 
+        a = answers(phoneNumber, seedK, answers)
+    in
+    [ 
+        Status('INIT', repId, userId, phoneNumber, seedK), 
+        MaskPerform(U, userId, phoneNumberH, <question, answers>),
+        !HumanMask(O, repIdH, repIdH)]
+    --[Eq(repIdH, repId), Eq(phoneNumber, phoneNumberH), Eq(a, permission(phoneNumber, seedK))]->
+    [MaskPerform(O, repIdH, repIdH, <'REPRESENTATIVE_CONFIRMS', phoneNumber>)]
 #ifdef SOCIALAUTH
 
 rule secureContactAttentive[colour=#9F2B68]:
